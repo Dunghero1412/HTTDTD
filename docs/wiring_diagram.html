@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sơ đồ nối dây – Pico 2W Sensor Node</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap');
+
+  :root {
+    --bg:       #0a0e1a;
+    --panel:    #111827;
+    --border:   #1e2d45;
+    --accent:   #00d4ff;
+    --green:    #00ff88;
+    --yellow:   #ffd600;
+    --red:      #ff4d6d;
+    --orange:   #ff8c42;
+    --purple:   #b388ff;
+    --text:     #c9d6e3;
+    --dim:      #4a6080;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Rajdhani', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  h1 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.1rem;
+    color: var(--accent);
+    text-align: center;
+    letter-spacing: 3px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--dim);
+    margin-bottom: 24px;
+    letter-spacing: 1px;
+  }
+
+  /* ── Main diagram canvas ── */
+  .diagram {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  svg.wiring {
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    max-width: 900px;
+    margin: 20px auto 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--text);
+  }
+  .legend-line {
+    width: 28px;
+    height: 3px;
+    border-radius: 2px;
+  }
+
+  /* ── Pin table ── */
+  .pin-tables {
+    max-width: 900px;
+    margin: 24px auto 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .pin-table {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .pin-table-header {
+    background: #162030;
+    padding: 8px 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+  }
+  .pin-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+  .pin-table td {
+    padding: 5px 14px;
+    border-bottom: 1px solid #1a2535;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .pin-table tr:last-child td { border-bottom: none; }
+  .pin-table td:first-child { color: var(--dim); }
+  .pin-table td:last-child  { color: var(--green); }
+  .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<h1>// WIRING DIAGRAM — SENSOR NODE</h1>
+<p class="subtitle">RPi Pico 2W · MCP3204 · OPA2134 × 4 · LoRa SX1278</p>
+
+<div class="diagram">
+<svg class="wiring" viewBox="0 0 860 560" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- glow filters -->
+    <filter id="glow-blue" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-green" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- arrow markers -->
+    <marker id="arr-blue" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#00d4ff"/>
+    </marker>
+    <marker id="arr-green" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#00ff88"/>
+    </marker>
+    <marker id="arr-yellow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#ffd600"/>
+    </marker>
+    <marker id="arr-orange" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#ff8c42"/>
+    </marker>
+    <marker id="arr-purple" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#b388ff"/>
+    </marker>
+  </defs>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- BACKGROUND GRID -->
+  <!-- ═══════════════════════════════════════════ -->
+  <pattern id="grid" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+    <path d="M20,0 L0,0 0,20" fill="none" stroke="#131e2e" stroke-width="0.5"/>
+  </pattern>
+  <rect width="860" height="560" fill="url(#grid)"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- PIEZO SENSORS (4 góc) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- Piezo 1 – Trên Trái -->
+  <rect x="10" y="30" width="110" height="52" rx="6" fill="#0f1c2e" stroke="#1e3a5f" stroke-width="1.5"/>
+  <text x="65" y="50" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="9" fill="#00d4ff">PIEZO CH0</text>
+  <text x="65" y="63" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080">Trên-Trái (0,0)</text>
+  <circle cx="118" cy="56" r="4" fill="#00d4ff" filter="url(#glow-blue)"/>
+
+  <!-- Piezo 2 – Trên Phải -->
+  <rect x="10" y="110" width="110" height="52" rx="6" fill="#0f1c2e" stroke="#1e3a5f" stroke-width="1.5"/>
+  <text x="65" y="130" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="9" fill="#00d4ff">PIEZO CH1</text>
+  <text x="65" y="143" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080">Trên-Phải (100,0)</text>
+  <circle cx="118" cy="136" r="4" fill="#00d4ff" filter="url(#glow-blue)"/>
+
+  <!-- Piezo 3 – Dưới Trái -->
+  <rect x="10" y="190" width="110" height="52" rx="6" fill="#0f1c2e" stroke="#1e3a5f" stroke-width="1.5"/>
+  <text x="65" y="210" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="9" fill="#00d4ff">PIEZO CH2</text>
+  <text x="65" y="223" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080">Dưới-Trái (0,100)</text>
+  <circle cx="118" cy="216" r="4" fill="#00d4ff" filter="url(#glow-blue)"/>
+
+  <!-- Piezo 4 – Dưới Phải -->
+  <rect x="10" y="270" width="110" height="52" rx="6" fill="#0f1c2e" stroke="#1e3a5f" stroke-width="1.5"/>
+  <text x="65" y="290" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="9" fill="#00d4ff">PIEZO CH3</text>
+  <text x="65" y="303" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080">Dưới-Phải(100,100)</text>
+  <circle cx="118" cy="296" r="4" fill="#00d4ff" filter="url(#glow-blue)"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- OPA2134 × 4 (op-amp conditioning) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- OPA 1 -->
+  <rect x="175" y="30" width="100" height="52" rx="6" fill="#0f1e18" stroke="#1a4030" stroke-width="1.5"/>
+  <text x="225" y="51" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="9" fill="#00ff88">OPA2134</text>
+  <text x="225" y="63" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080">Amp #1</text>
+  <circle cx="175" cy="56" r="4" fill="#00ff88"/>
+  <circle cx="273" cy="56" r="4" fill="#00ff88"/>
+
+  <!-- OPA 2 -->
+  <rect x="175" y="110" width="100" height="52" rx="6" fill="#0f1e18" stroke="#1a4030" stroke-width="1.5"/>
+  <text x="225" y="131" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="9" fill="#00ff88">OPA2134</text>
+  <text x="225" y="143" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080">Amp #2</text>
+  <circle cx="175" cy="136" r="4" fill="#00ff88"/>
+  <circle cx="273" cy="136" r="4" fill="#00ff88"/>
+
+  <!-- OPA 3 -->
+  <rect x="175" y="190" width="100" height="52" rx="6" fill="#0f1e18" stroke="#1a4030" stroke-width="1.5"/>
+  <text x="225" y="211" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="9" fill="#00ff88">OPA2134</text>
+  <text x="225" y="223" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080">Amp #3</text>
+  <circle cx="175" cy="216" r="4" fill="#00ff88"/>
+  <circle cx="273" cy="216" r="4" fill="#00ff88"/>
+
+  <!-- OPA 4 -->
+  <rect x="175" y="270" width="100" height="52" rx="6" fill="#0f1e18" stroke="#1a4030" stroke-width="1.5"/>
+  <text x="225" y="291" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="9" fill="#00ff88">OPA2134</text>
+  <text x="225" y="303" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080">Amp #4</text>
+  <circle cx="175" cy="296" r="4" fill="#00ff88"/>
+  <circle cx="273" cy="296" r="4" fill="#00ff88"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- MCP3204 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="330" y="120" width="130" height="160" rx="8" fill="#1a1428" stroke="#3d2080" stroke-width="1.5"/>
+  <text x="395" y="145" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="10" fill="#b388ff">MCP3204</text>
+  <text x="395" y="158" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="8" fill="#4a6080">12-bit ADC / SPI</text>
+
+  <!-- MCP pins left (CH0-CH3) -->
+  <circle cx="332" cy="178" r="4" fill="#b388ff"/><text x="342" y="182" font-family="Share Tech Mono,monospace" font-size="8" fill="#b388ff">CH0</text>
+  <circle cx="332" cy="198" r="4" fill="#b388ff"/><text x="342" y="202" font-family="Share Tech Mono,monospace" font-size="8" fill="#b388ff">CH1</text>
+  <circle cx="332" cy="218" r="4" fill="#b388ff"/><text x="342" y="222" font-family="Share Tech Mono,monospace" font-size="8" fill="#b388ff">CH2</text>
+  <circle cx="332" cy="238" r="4" fill="#b388ff"/><text x="342" y="242" font-family="Share Tech Mono,monospace" font-size="8" fill="#b388ff">CH3</text>
+
+  <!-- MCP pins right (SPI) -->
+  <circle cx="458" cy="178" r="4" fill="#ffd600"/><text x="422" y="182" font-family="Share Tech Mono,monospace" font-size="8" fill="#ffd600">CLK </text>
+  <circle cx="458" cy="198" r="4" fill="#ffd600"/><text x="414" y="202" font-family="Share Tech Mono,monospace" font-size="8" fill="#ffd600">MISO </text>
+  <circle cx="458" cy="218" r="4" fill="#ffd600"/><text x="414" y="222" font-family="Share Tech Mono,monospace" font-size="8" fill="#ffd600">MOSI </text>
+  <circle cx="458" cy="238" r="4" fill="#ffd600"/><text x="426" y="242" font-family="Share Tech Mono,monospace" font-size="8" fill="#ffd600">CS  </text>
+
+  <!-- VDD / GND MCP -->
+  <circle cx="395" cy="122" r="4" fill="#ff4d6d"/><text x="380" y="118" font-family="Share Tech Mono,monospace" font-size="8" fill="#ff4d6d">VDD</text>
+  <circle cx="395" cy="278" r="4" fill="#4a6080"/><text x="380" y="292" font-family="Share Tech Mono,monospace" font-size="8" fill="#4a6080">GND</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- PICO 2W -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="540" y="60" width="160" height="340" rx="10" fill="#12100a" stroke="#3d3010" stroke-width="2"/>
+  <text x="620" y="88" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="11" fill="#ffd600">RPi PICO 2W</text>
+  <text x="620" y="100" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="8" fill="#4a6080">RP2350 · 150MHz</text>
+
+  <!-- Pico SPI pins -->
+  <circle cx="542" cy="145" r="4" fill="#ffd600"/><text x="553" y="149" font-family="Share Tech Mono,monospace" font-size="8" fill="#ffd600">GP16 MISO</text>
+  <circle cx="542" cy="165" r="4" fill="#ffd600"/><text x="553" y="169" font-family="Share Tech Mono,monospace" font-size="8" fill="#ffd600">GP17 CS  </text>
+  <circle cx="542" cy="185" r="4" fill="#ffd600"/><text x="553" y="189" font-family="Share Tech Mono,monospace" font-size="8" fill="#ffd600">GP18 CLK </text>
+  <circle cx="542" cy="205" r="4" fill="#ffd600"/><text x="553" y="209" font-family="Share Tech Mono,monospace" font-size="8" fill="#ffd600">GP19 MOSI</text>
+
+  <!-- Pico UART pins -->
+  <circle cx="542" cy="235" r="4" fill="#ff8c42"/><text x="553" y="239" font-family="Share Tech Mono,monospace" font-size="8" fill="#ff8c42">GP0  TX  </text>
+  <circle cx="542" cy="255" r="4" fill="#ff8c42"/><text x="553" y="259" font-family="Share Tech Mono,monospace" font-size="8" fill="#ff8c42">GP1  RX  </text>
+
+  <!-- Pico GPIO20 -->
+  <circle cx="542" cy="285" r="4" fill="#00ff88"/><text x="553" y="289" font-family="Share Tech Mono,monospace" font-size="8" fill="#00ff88">GP20 CTRL</text>
+
+  <!-- Pico PWR -->
+  <circle cx="542" cy="315" r="4" fill="#ff4d6d"/><text x="553" y="319" font-family="Share Tech Mono,monospace" font-size="8" fill="#ff4d6d">3V3 OUT </text>
+  <circle cx="542" cy="335" r="4" fill="#4a6080"/><text x="553" y="339" font-family="Share Tech Mono,monospace" font-size="8" fill="#4a6080">GND     </text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- LoRa SX1278 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="730" y="200" width="118" height="150" rx="8" fill="#1a0f10" stroke="#4d1520" stroke-width="1.5"/>
+  <text x="789" y="222" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="10" fill="#ff4d6d">SX1278</text>
+  <text x="789" y="234" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="8" fill="#4a6080">LoRa 433MHz</text>
+
+  <circle cx="732" cy="252" r="4" fill="#ff8c42"/><text x="742" y="256" font-family="Share Tech Mono,monospace" font-size="8" fill="#ff8c42">RXD</text>
+  <circle cx="732" cy="272" r="4" fill="#ff8c42"/><text x="742" y="276" font-family="Share Tech Mono,monospace" font-size="8" fill="#ff8c42">TXD</text>
+  <circle cx="732" cy="292" r="4" fill="#ff4d6d"/><text x="742" y="296" font-family="Share Tech Mono,monospace" font-size="8" fill="#ff4d6d">VCC</text>
+  <circle cx="732" cy="312" r="4" fill="#4a6080"/><text x="742" y="316" font-family="Share Tech Mono,monospace" font-size="8" fill="#4a6080">GND</text>
+  <circle cx="732" cy="332" r="4" fill="#4a6080"/><text x="742" y="336" font-family="Share Tech Mono,monospace" font-size="8" fill="#4a6080">M0 →GND</text>
+
+  <!-- Antenna symbol -->
+  <line x1="789" y1="200" x2="789" y2="180" stroke="#ff4d6d" stroke-width="1.5"/>
+  <line x1="789" y1="180" x2="775" y2="165" stroke="#ff4d6d" stroke-width="1.5"/>
+  <line x1="789" y1="180" x2="803" y2="165" stroke="#ff4d6d" stroke-width="1.5"/>
+  <text x="789" y="160" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="8" fill="#ff4d6d">ANT</text>
+
+  <!-- Relay/Motor block -->
+  <rect x="540" y="430" width="160" height="50" rx="6" fill="#0a1a0a" stroke="#1a4030" stroke-width="1.5"/>
+  <text x="620" y="451" text-anchor="middle" font-family="Share Tech Mono,monospace" font-size="9" fill="#00ff88">RELAY / MOTOR</text>
+  <text x="620" y="466" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080">Điều khiển nâng/hạ bia</text>
+  <circle cx="542" cy="455" r="4" fill="#00ff88"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- WIRES -->
+  <!-- ═══════════════════════════════════════════ -->
+
+  <!-- Piezo → OPA (blue) -->
+  <line x1="118" y1="56"  x2="175" y2="56"  stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <line x1="118" y1="136" x2="175" y2="136" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <line x1="118" y1="216" x2="175" y2="216" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <line x1="118" y1="296" x2="175" y2="296" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+
+  <!-- OPA → MCP CH0-CH3 (purple) -->
+  <path d="M273,56  L306,56  L306,178 L332,178" stroke="#b388ff" stroke-width="1.5" fill="none" marker-end="url(#arr-purple)"/>
+  <path d="M273,136 L310,136 L310,198 L332,198" stroke="#b388ff" stroke-width="1.5" fill="none" marker-end="url(#arr-purple)"/>
+  <path d="M273,216 L310,216 L310,218 L332,218" stroke="#b388ff" stroke-width="1.5" fill="none" marker-end="url(#arr-purple)"/>
+  <path d="M273,296 L306,296 L306,238 L332,238" stroke="#b388ff" stroke-width="1.5" fill="none" marker-end="url(#arr-purple)"/>
+
+  <!-- MCP SPI → Pico (yellow) -->
+  <!-- CLK: MCP-CLK(458,178) → Pico GP18(542,185) -->
+  <path d="M458,178 L500,178 L500,185 L542,185" stroke="#ffd600" stroke-width="1.5" fill="none" marker-end="url(#arr-yellow)"/>
+  <!-- MISO: MCP(458,198) → Pico GP16(542,145) -->
+  <path d="M458,198 L504,198 L504,145 L542,145" stroke="#ffd600" stroke-width="1.5" fill="none" marker-end="url(#arr-yellow)"/>
+  <!-- MOSI: MCP(458,218) → Pico GP19(542,205) -->
+  <path d="M458,218 L508,218 L508,205 L542,205" stroke="#ffd600" stroke-width="1.5" fill="none" marker-end="url(#arr-yellow)"/>
+  <!-- CS: MCP(458,238) → Pico GP17(542,165) -->
+  <path d="M458,238 L512,238 L512,165 L542,165" stroke="#ffd600" stroke-width="1.5" fill="none" marker-end="url(#arr-yellow)"/>
+
+  <!-- Pico UART → LoRa (orange) -->
+  <!-- GP0 TX → LoRa RXD -->
+  <path d="M700,235 L716,235 L716,252 L732,252" stroke="#ff8c42" stroke-width="1.5" fill="none" marker-end="url(#arr-orange)"/>
+  <!-- GP1 RX ← LoRa TXD -->
+  <path d="M700,255 L720,255 L720,272 L732,272" stroke="#ff8c42" stroke-width="1.5" fill="none" marker-end="url(#arr-orange)" stroke-dasharray="5,3"/>
+
+  <!-- GP20 → Relay (green) -->
+  <path d="M542,285 L528,285 L528,455 L542,455" stroke="#00ff88" stroke-width="1.5" fill="none" marker-end="url(#arr-green)"/>
+
+  <!-- 3V3 power rails (red dashed) -->
+  <line x1="542" y1="315" x2="480" y2="315" stroke="#ff4d6d" stroke-width="1" stroke-dasharray="4,3"/>
+  <path d="M480,315 L480,122 L395,122" stroke="#ff4d6d" stroke-width="1" fill="none" stroke-dasharray="4,3" marker-end="url(#arr-blue)"/>
+  <!-- 3V3 → LoRa VCC -->
+  <path d="M700,315 L716,315 L716,292 L732,292" stroke="#ff4d6d" stroke-width="1" fill="none" stroke-dasharray="4,3"/>
+
+  <!-- GND rails (dim) -->
+  <line x1="542" y1="335" x2="522" y2="335" stroke="#4a6080" stroke-width="1" stroke-dasharray="3,3"/>
+  <path d="M522,335 L522,278 L395,278" stroke="#4a6080" stroke-width="1" fill="none" stroke-dasharray="3,3"/>
+  <path d="M700,335 L716,335 L716,312 L732,312" stroke="#4a6080" stroke-width="1" fill="none" stroke-dasharray="3,3"/>
+
+  <!-- label: TX/RX -->
+  <text x="710" y="248" font-family="Share Tech Mono,monospace" font-size="7" fill="#ff8c42">TX→RX</text>
+  <text x="710" y="268" font-family="Share Tech Mono,monospace" font-size="7" fill="#ff8c42">RX←TX</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION LABELS -->
+  <!-- ═══════════════════════════════════════════ -->
+  <text x="65"  y="20" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080" letter-spacing="2">SENSORS</text>
+  <text x="225" y="20" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080" letter-spacing="2">CONDITIONING</text>
+  <text x="395" y="112" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080" letter-spacing="2">ADC MUX</text>
+  <text x="620" y="52" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080" letter-spacing="2">MCU</text>
+  <text x="789" y="192" text-anchor="middle" font-family="Rajdhani,sans-serif" font-size="9" fill="#4a6080" letter-spacing="2">LORA</text>
+
+  <!-- border -->
+  <rect x="2" y="2" width="856" height="556" rx="10" fill="none" stroke="#1e2d45" stroke-width="1.5"/>
+</svg>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-line" style="background:#00d4ff"></div>Piezo Signal</div>
+  <div class="legend-item"><div class="legend-line" style="background:#b388ff"></div>Analog (OPA→MCP)</div>
+  <div class="legend-item"><div class="legend-line" style="background:#ffd600"></div>SPI Bus</div>
+  <div class="legend-item"><div class="legend-line" style="background:#ff8c42"></div>UART (LoRa)</div>
+  <div class="legend-item"><div class="legend-line" style="background:#00ff88"></div>GPIO Control</div>
+  <div class="legend-item"><div class="legend-line" style="background:#ff4d6d; border-top: 2px dashed #ff4d6d; background:none; border-bottom:none"></div>3.3V Power</div>
+  <div class="legend-item"><div class="legend-line" style="border-top: 2px dashed #4a6080; background:none; border-bottom:none"></div>GND</div>
+</div>
+
+<!-- Pin tables -->
+<div class="pin-tables">
+
+  <div class="pin-table">
+    <div class="pin-table-header">● SPI0 — MCP3204</div>
+    <table>
+      <tr><td>GP16 (MISO)</td><td>← DOUT MCP</td></tr>
+      <tr><td>GP17 (CS)</td>  <td>→ CS̄  MCP</td></tr>
+      <tr><td>GP18 (SCK)</td> <td>→ CLK MCP</td></tr>
+      <tr><td>GP19 (MOSI)</td><td>→ DIN MCP</td></tr>
+    </table>
+  </div>
+
+  <div class="pin-table">
+    <div class="pin-table-header">● UART0 — LoRa SX1278</div>
+    <table>
+      <tr><td>GP0 (TX)</td><td>→ RXD LoRa</td></tr>
+      <tr><td>GP1 (RX)</td><td>← TXD LoRa</td></tr>
+      <tr><td>M0 / M1</td><td>→ GND (transparent)</td></tr>
+    </table>
+  </div>
+
+  <div class="pin-table">
+    <div class="pin-table-header">● GPIO — Control</div>
+    <table>
+      <tr><td>GP20</td><td>→ Relay IN</td></tr>
+    </table>
+  </div>
+
+  <div class="pin-table">
+    <div class="pin-table-header">● Power Rails</div>
+    <table>
+      <tr><td>3V3 OUT</td><td>→ VDD MCP3204, VCC LoRa, VCC OPA2134</td></tr>
+      <tr><td>GND</td>    <td>→ GND tất cả IC</td></tr>
+    </table>
+  </div>
+
+  <div class="pin-table">
+    <div class="pin-table-header">● OPA2134 — Conditioning (×4)</div>
+    <table>
+      <tr><td>IN+</td><td>← Piezo (+)</td></tr>
+      <tr><td>IN−</td><td>← GND qua 1MΩ</td></tr>
+      <tr><td>OUT</td><td>→ CH0–CH3 MCP3204</td></tr>
+      <tr><td>V+/V−</td><td>±5V hoặc 3.3V single</td></tr>
+    </table>
+  </div>
+
+</div>
+
+</body>
+</html>
