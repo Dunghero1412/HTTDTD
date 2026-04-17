@@ -19,8 +19,11 @@
 
 ### Sơ Đồ Hệ Thống
 ## 📊 Sơ Đồ Mạch
+'''
 
 <iframe src="docs/wiring-diagram.html" width="100%" height="600px" frameborder="0"></iframe>
+
+'''
 ### Quy Trình Hoạt Động
 
 #### **1. Giai Đoạn Khởi Động**
