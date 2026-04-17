@@ -21,6 +21,8 @@
 ## 📊 Sơ Đồ Mạch
 '''
 
+[Xem sơ đồ mạch chi tiết](docs/wiring_diagram.html)
+
 <iframe src="docs/wiring_diagram.html" width="100%" height="600px" frameborder="0"></iframe>
 
 '''
