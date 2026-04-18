@@ -22,12 +22,13 @@
 ### Sơ Đồ Hệ Thống
 ## 📊 Sơ Đồ Mạch
 ```
-
+```
 [Xem sơ đồ mạch chi tiết](docs/wiring_diagram.html)
 ## So do mach node
 ![Wiring Diagram](docs/wiring_diagram.svg)
 ## So do mach controller
 ![Wiring Diagram](docs/wiring_diagram_controller.svg)
+```
 ```
 ### Quy Trình Hoạt Động
 
