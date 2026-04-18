@@ -13,6 +13,8 @@
 - **Lưu log tự động**: Tất cả dữ liệu điểm được lưu vào file `score.txt`
 - **Giao diện đơn giản**: Chỉ cần bấm nút để điều khiển, không cần bàn phím chuột
 
+```
+
 ---
 
 ## 🔧 Cách Hoạt Động Chung
