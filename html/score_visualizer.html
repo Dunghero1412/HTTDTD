@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bảng điểm bắn súng</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=Rajdhani:wght@400;600;700&display=swap');
+  :root {
+    --bg: #0b0c0e; --panel: #13151a; --border: #222530;
+    --accent: #e8c840; --red: #e03030; --text: #d0d4dc; --dim: #404560;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Rajdhani', sans-serif; min-height: 100vh; padding: 16px; }
+
+  h1 { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 4px; color: var(--accent); text-align: center; margin-bottom: 4px; }
+  .sub { text-align: center; font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; color: var(--dim); margin-bottom: 16px; letter-spacing: 2px; }
+
+  .layout { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+
+  /* ── Target canvas ── */
+  .target-wrap { position: relative; }
+  canvas#target { border-radius: 8px; display: block; }
+
+  /* ── Score panel ── */
+  .score-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; min-width: 260px; flex: 1; max-width: 380px; }
+  .score-panel h2 { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--accent); letter-spacing: 3px; margin-bottom: 10px; }
+
+  .node-block { margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .node-title { font-family: 'Share Tech Mono', monospace; font-size: 0.8rem; color: var(--accent); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .node-total { font-size: 1.3rem; font-weight: 700; color: #fff; }
+  .hit-row { display: flex; justify-content: space-between; font-size: 0.78rem; padding: 2px 0; color: var(--dim); font-family: 'Share Tech Mono', monospace; }
+  .hit-row .score-badge { color: var(--accent); font-weight: 700; }
+  .hit-row .miss-badge  { color: var(--red); }
+
+  /* ── Controls ── */
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .btn { background: #1a1e2a; border: 1px solid var(--border); color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; padding: 6px 12px; border-radius: 4px; cursor: pointer; transition: background .15s; }
+  .btn:hover { background: #252a3a; border-color: var(--accent); color: var(--accent); }
+  .btn.active { background: #2a2010; border-color: var(--accent); color: var(--accent); }
+
+  /* ── Demo input ── */
+  .demo-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .demo-row input { background: #1a1e2a; border: 1px solid var(--border); color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; padding: 5px 8px; border-radius: 4px; width: 70px; }
+  .demo-row select { background: #1a1e2a; border: 1px solid var(--border); color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; padding: 5px 8px; border-radius: 4px; }
+  .demo-row label { font-size: 0.75rem; color: var(--dim); font-family: 'Share Tech Mono', monospace; }
+</style>
+</head>
+<body>
+
+<h1>SHOOTING SCORE BOARD</h1>
+<p class="sub">100×100 CM · 10 RINGS · R=7.5 CM/RING</p>
+
+<div class="layout">
+
+  <!-- Target Canvas -->
+  <div class="target-wrap">
+    <canvas id="target" width="400" height="400"></canvas>
+  </div>
+
+  <!-- Score Panel -->
+  <div class="score-panel">
+    <h2>BẢNG ĐIỂM</h2>
+
+    <!-- Node selector -->
+    <div class="controls" id="nodeButtons"></div>
+
+    <!-- Demo input -->
+    <div class="demo-row">
+      <label>X:</label>
+      <input type="number" id="inX" value="50" min="0" max="100" step="0.1">
+      <label>Y:</label>
+      <input type="number" id="inY" value="50" min="0" max="100" step="0.1">
+      <select id="selNode"></select>
+      <button class="btn" onclick="addHit()">+ Thêm</button>
+      <button class="btn" onclick="clearAll()">Xoá</button>
+    </div>
+
+    <!-- Per-node scores -->
+    <div id="scoreList"></div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────
+const NODES = ["NODE1","NODE2","NODE3","NODE4","NODE5"];
+const RING_R = 7.5, NUM_RINGS = 10;
+const W = 100; // cm
+
+// hits[node] = [{x,y,score,r}]
+const hits = {};
+NODES.forEach(n => hits[n] = []);
+let activeNode = "NODE1";
+
+// Node colours
+const NODE_COLORS = {
+  NODE1: "#e8c840", NODE2: "#40c8e8", NODE3: "#e84060",
+  NODE4: "#60e840", NODE5: "#c040e8"
+};
+
+// ── Scoring ────────────────────────────────────
+function calcScore(x, y) {
+  const cx = x - 50, cy = y - 50;
+  const r = Math.sqrt(cx*cx + cy*cy);
+  if (r > NUM_RINGS * RING_R) return { score: 0, r };
+  const idx = Math.floor(r / RING_R);
+  return { score: Math.max(1, NUM_RINGS - idx), r };
+}
+
+// ── Canvas drawing ─────────────────────────────
+const canvas = document.getElementById("target");
+const ctx    = canvas.getContext("2d");
+const PX = canvas.width / W;  // 4px per cm
+
+function drawTarget() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Background
+  ctx.fillStyle = "#0b0c0e";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+
+  // Rings (10 → 1, inside out)
+  const ringColors = [
+    "#ffffff","#ffffff",          // 10,9 – white inner
+    "#000000","#000000",          // 8,7 – black
+    "#888888","#888888",          // 6,5 – grey
+    "#444444","#444444",          // 4,3
+    "#222222","#222222",          // 2,1
+  ];
+  for (let i = NUM_RINGS; i >= 1; i--) {
+    const r = (NUM_RINGS - i + 1) * RING_R * PX;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.fillStyle = ringColors[NUM_RINGS - i];
+    ctx.fill();
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  // Ring labels
+  ctx.font = "bold 9px 'Share Tech Mono', monospace";
+  ctx.textAlign = "center";
+  for (let i = 1; i <= NUM_RINGS; i++) {
+    const r = (NUM_RINGS - i + 1) * RING_R * PX;
+    const prev = (NUM_RINGS - i) * RING_R * PX;
+    const mid = (r + prev) / 2;
+    ctx.fillStyle = (i >= 9) ? "#000" : "#aaa";
+    ctx.fillText(i, cx + mid * 0.71, cy - mid * 0.71 + 3);
+  }
+
+  // Crosshair
+  ctx.strokeStyle = "#333"; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx, canvas.height); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(canvas.width,cy); ctx.stroke();
+
+  // Hits for all nodes
+  NODES.forEach(node => {
+    hits[node].forEach((h, idx) => {
+      const px = h.x * PX, py = h.y * PX;
+      const col = NODE_COLORS[node];
+
+      // Impact circle
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI*2);
+      ctx.fillStyle = col + "cc";
+      ctx.fill();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Score label
+      ctx.fillStyle = col;
+      ctx.font = "bold 10px 'Share Tech Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(h.score > 0 ? h.score : "M", px, py - 8);
+    });
+  });
+
+  // Active node indicator
+  ctx.fillStyle = NODE_COLORS[activeNode];
+  ctx.font = "bold 10px 'Rajdhani', sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("● " + activeNode, 8, 16);
+}
+
+// ── UI ────────────────────────────────────────
+function buildUI() {
+  // Node buttons
+  const nb = document.getElementById("nodeButtons");
+  nb.innerHTML = "";
+  NODES.forEach(n => {
+    const b = document.createElement("button");
+    b.className = "btn" + (n === activeNode ? " active" : "");
+    b.textContent = n;
+    b.style.borderColor = n === activeNode ? NODE_COLORS[n] : "";
+    b.style.color       = n === activeNode ? NODE_COLORS[n] : "";
+    b.onclick = () => { activeNode = n; buildUI(); drawTarget(); };
+    nb.appendChild(b);
+  });
+
+  // Select node for add
+  const sel = document.getElementById("selNode");
+  sel.innerHTML = "";
+  NODES.forEach(n => {
+    const o = document.createElement("option");
+    o.value = n; o.textContent = n;
+    if (n === activeNode) o.selected = true;
+    sel.appendChild(o);
+  });
+
+  // Score list
+  const sl = document.getElementById("scoreList");
+  sl.innerHTML = "";
+  NODES.forEach(n => {
+    const total = hits[n].reduce((s, h) => s + h.score, 0);
+    const div = document.createElement("div");
+    div.className = "node-block";
+    div.innerHTML = `
+      <div class="node-title">
+        <span style="color:${NODE_COLORS[n]}">■ ${n}</span>
+        <span class="node-total">${total} điểm</span>
+      </div>
+      ${hits[n].map((h,i) => `
+        <div class="hit-row">
+          <span>#${i+1} x=${h.x.toFixed(1)} y=${h.y.toFixed(1)} r=${h.r.toFixed(1)}cm</span>
+          <span class="${h.score>0?'score-badge':'miss-badge'}">
+            ${h.score>0 ? '★'+h.score+' Vòng'+h.score : 'MISS'}
+          </span>
+        </div>`).join("")}
+    `;
+    sl.appendChild(div);
+  });
+}
+
+function addHit() {
+  const x = parseFloat(document.getElementById("inX").value);
+  const y = parseFloat(document.getElementById("inY").value);
+  const node = document.getElementById("selNode").value;
+  if (isNaN(x)||isNaN(y)) return;
+  const {score, r} = calcScore(x, y);
+  hits[node].push({x, y, score, r: parseFloat(r.toFixed(2))});
+  buildUI(); drawTarget();
+}
+
+function clearAll() {
+  NODES.forEach(n => hits[n] = []);
+  buildUI(); drawTarget();
+}
+
+// ── Random demo hits ──────────────────────────
+function demoHits() {
+  NODES.forEach((n, ni) => {
+    for (let i = 0; i < 3; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist  = Math.random() * 60;
+      const x = parseFloat((50 + dist * Math.cos(angle)).toFixed(2));
+      const y = parseFloat((50 + dist * Math.sin(angle)).toFixed(2));
+      const {score, r} = calcScore(x, y);
+      hits[n].push({x, y, score, r: parseFloat(r.toFixed(2))});
+    }
+  });
+  buildUI(); drawTarget();
+}
+
+// ── Init ──────────────────────────────────────
+buildUI();
+drawTarget();
+// Thêm nút demo
+const ctrl = document.querySelector(".controls");
+const db = document.createElement("button");
+db.className = "btn"; db.textContent = "Demo"; db.onclick = demoHits;
+document.querySelector(".demo-row").appendChild(db);
+</script>
+</body>
+</html>
