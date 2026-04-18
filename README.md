@@ -19,13 +19,14 @@
 
 ### Sơ Đồ Hệ Thống
 ## 📊 Sơ Đồ Mạch
-'''
+```
 
 [Xem sơ đồ mạch chi tiết](docs/wiring_diagram.html)
-
-<iframe src="docs/wiring_diagram.html" width="100%" height="600px" frameborder="0"></iframe>
-
-'''
+## So do mach node
+![Wiring Diagram](docs/wiring_diagram.svg)
+## So do mach controller
+![Wiring Diagram](docs/wiring_diagram_controller.svg)
+```
 ### Quy Trình Hoạt Động
 
 #### **1. Giai Đoạn Khởi Động**
