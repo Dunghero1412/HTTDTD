@@ -214,7 +214,7 @@ sudo apt upgrade
 cd HTTDTD
 chmod 755 /opt
 python3 setup.py install controller
-'''
+```
 #### 2. cấu hình uart
 ```bash
 # Mở raspi-config
