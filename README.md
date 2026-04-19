@@ -1,5 +1,11 @@
 ```markdown
-# HTTDTD - Hệ Thống Tính Điểm Tự Động Dùng Cho Bắn Súng
+# HTTDTD - Hệ Thống Tính Điểm Tự Động Dùng Cho Bắn Súng.
+
+## DỰ ÁN ĐƯỢC TẠO BỞI Dunghero1412
+## Người tạo dự án : Chiêm Dũng.
+## Người bảo trì dự án : Chiêm Dũng.
+
+**dự án đã được đăng ký giấy phép MIT license - bất kỳ cá nhân , tổ chức hoặc đơn vị nào cũng đều được phép clone , chỉnh sửa và sử dụng mã nguồn**
 
 ## 📋 Giới Thiệu Dự Án
 
@@ -24,9 +30,9 @@
 ```
 ```
 [Xem sơ đồ mạch chi tiết](docs/wiring_diagram.html)
-## So do mach node
+## Sơ đồ mạch dành cho NODE:
 ![Wiring Diagram](docs/wiring_diagram.svg)
-## So do mach controller
+## Sơ đồ mạch dùng cho CONTROLLER:
 ![Wiring Diagram](docs/wiring_diagram_controller.svg)
 ```
 ```
@@ -188,7 +194,85 @@ dựa trên khoảng cách từ 4 cảm biến
 
 ---
 
-## 📦 Hướng Dẫn Cài Đặt
+## 📦 Hướng Dẫn Cài Đặt Tự động
+
+### 1. Clone Repository
+
+```bash
+# Clone từ GitHub
+git clone https://github.com/Dunghero1412/HTTDTD.git
+cd HTTDTD
+# Clone trên mỗi board kể cả Controller và tất cả các node.
+```
+
+## 2. Cài đặt Controller (RPi 5)
+
+#### 1.cài đặt file cơ bản.
+```bash
+sudo apt update
+sudo apt upgrade
+cd HTTDTD
+chmod 755 /opt
+python3 setup.py install controller
+'''
+#### 2. cấu hình uart
+```bash
+# Mở raspi-config
+sudo raspi-config
+
+# Chọn: Interfacing Options → Serial Port
+# Enable Serial: Yes
+# Login shell: No
+# Hardware serial: Yes
+
+# Khởi động lại
+sudo reboot
+```
+#### **Bước 3: Cài đặt Python packages**
+```bash
+# Cài pip (nếu chưa có)
+sudo apt install python3-pip -y
+
+# Cài các thư viện cần thiết
+pip3 install RPi.GPIO rpi-lora
+```
+
+
+## 3. Cài đặt Node ( RPi Nano 2w)
+
+#### 1. cài đặt file cơ bản.
+```bash
+sudo apt update
+sudo apt upgrade 
+cd HTTDTD
+chmod 755
+python3 setup.py install node<mã của node . ví dụ : 2>
+'''
+
+#### Bước 2: Bật SPI
+```bash
+# Mở raspi-config
+sudo raspi-config
+
+# Chọn: Interfacing Options → SPI
+# Enable SPI: Yes
+
+# Khởi động lại
+sudo reboot
+```
+
+#### Bước 3: Cài đặt Python packages
+```bash
+# Cài pip (nếu chưa có)
+sudo apt install python3-pip -y
+
+# Cài các thư viện cần thiết
+pip3 install RPi.GPIO rpi-lora spidev adafruit-circuitpython-mcp3x0x
+```
+
+
+
+## 📦 Hướng Dẫn Cài Đặt Thủ Công
 
 ### 1. Clone Repository
 
