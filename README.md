@@ -247,7 +247,7 @@ sudo apt upgrade
 cd HTTDTD
 chmod 755
 python3 setup.py install node<mã của node . ví dụ : 2>
-'''
+```
 
 #### Bước 2: Bật SPI
 ```bash
