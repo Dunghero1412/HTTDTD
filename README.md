@@ -109,8 +109,9 @@ Dừng phát hiện viên đạn
 
 #### **Giao Thức LoRa**
 - **Tần số**: 915 MHz (ISM band - công nghiệp, khoa học, y tế)
-- **Tốc độ baud**: 60000 bps
-- **Khoảng cách**: Tối đa vài km (tùy môi trường)
+- **Tốc độ baud**: 57600 bps
+- **Khoảng cách tối đa**: Vài km (tùy môi trường)
+- **Khoảng cách tối ưu**: 200m đến 700m
 - **Định dạng lệnh**: `NODE1 UP` hoặc `NODE1 DOWN`
 - **Định dạng dữ liệu**: `NODE 1, -26, 30`
 
