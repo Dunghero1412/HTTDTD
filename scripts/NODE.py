@@ -15,6 +15,7 @@ import math                                # Thư viện tính toán toán học
 import spidev                              # Thư viện giao tiếp SPI để đọc MCP3204
 from rpi_lora import LoRa                  # Thư viện LoRa
 from rpi_lora.board_config import BOARD    # Cấu hình board cho LoRa
+import random                              # Thư viện random số liệu cho function delay if channel busy
 
 # ==================== CẤU HÌNH CHUNG ====================
 
@@ -66,6 +67,22 @@ NODE_NAME = "NODE1"
 # --- Tốc độ âm thanh ---
 # Dùng để tính khoảng cách từ thời gian phát hiện
 SOUND_SPEED = 340                          # m/s ở nhiệt độ 15°C
+
+# ==================== CẤU HÌNH CSMA (CARRIER SENSE MULTIPLE ACCESS) ====================
+# Kiểm tra channel có đang gửi or nhận kết quả từ node khác hay không? Nếu có bắt đầu delay rồi gửi sau.
+
+# Thời gian kiểm tra channel có bận không (ms)
+CARRIER_SENSE_TIME = 100  # Kiểm tra 100ms
+
+# Min backoff delay nếu channel bận (ms)
+MIN_BACKOFF = 50
+
+# Max backoff delay nếu channel bận (ms)
+MAX_BACKOFF = 100
+
+# Số lần thử lại nếu channel bận
+MAX_RETRIES = 3
+
 
 # ==================== KHỞI TẠO CÁC THIẾT BỊ ====================
 
@@ -302,6 +319,64 @@ def triangulation(detections):
         # In lỗi nếu có vấn đề trong tính toán
         print(f"[ERROR] Triangulation error: {e}")
         return None, None
+
+
+# ==================== HÀM KIỂM TRA CHANNEL (CARRIER SENSE) ====================
+
+def is_channel_busy():
+    """
+    Kiểm tra xem LoRa channel có bận không
+    (có dữ liệu đang được truyền?)
+    
+    Trả về:
+        bool: True nếu channel bận, False nếu rỗi
+    """
+    try:
+        # Kiểm tra xem LoRa có đang nhận dữ liệu không
+        if lora.is_rx_busy():
+            print("[CSMA] Channel BUSY - LoRa is receiving")
+            return True
+        
+        return False
+    
+    except Exception as e:
+        print(f"[ERROR] Failed to check channel: {e}")
+        return False
+
+def wait_for_channel():
+    """
+    Chờ đợi cho đến khi channel rỗi, sau đó gửi dữ liệu
+    
+    Hoạt động:
+    1. Kiểm tra xem channel có bận không
+    2. Nếu bận, chờ random delay (50-500ms)
+    3. Lặp lại tối đa 3 lần
+    4. Nếu vẫn bận sau 3 lần, gửi bình thường
+    
+    Trả về:
+        bool: True nếu có thể gửi, False nếu không
+    """
+    retries = 0
+    
+    while retries < MAX_RETRIES:
+        # Kiểm tra channel
+        if not is_channel_busy():
+            print("[CSMA] Channel FREE - Ready to send")
+            return True
+        
+        # Channel bận, tính backoff delay
+        backoff_delay = random.randint(MIN_BACKOFF, MAX_BACKOFF) / 1000.0  # Convert ms to seconds
+        print(f"[CSMA] Channel busy, waiting {backoff_delay*1000:.0f}ms (Retry {retries+1}/{MAX_RETRIES})")
+        
+        # Chờ
+        time.sleep(backoff_delay)
+        
+        # Tăng retry counter
+        retries += 1
+    
+    # Sau MAX_RETRIES lần, vẫn gửi
+    print(f"[CSMA] Max retries reached, sending anyway")
+    return True
 
 # ==================== HÀM GỬIỮ DỮ LIỆU ====================
 
