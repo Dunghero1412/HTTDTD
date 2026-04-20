@@ -23,7 +23,7 @@ import json				   # json library
 
 # --- Cấu hình UART cho LoRa ---
 UART_PORT = "/dev/ttyAMA1"                 # UART 1 trên RPi 5 nối với LoRa
-BAUD_RATE = 60000                          # Tốc độ baud 60000 bps
+BAUD_RATE = 57600                          # Tốc độ baud 57600 bps , đúng với cấu hình tiêu chuẩn tầm trung (100 - 600m) với tốc độ cao nhất.
 
 # --- Cấu hình GPIO cho các nút bấm ---
 # Các nút được nối vào GPIO 2-8 trên RPi 5
