@@ -34,7 +34,7 @@ BUTTON_PINS = {
     5: "NODE4",                            # GPIO 5 -> Node 4
     6: "NODE5",                            # GPIO 6 -> Node 5
     7: "A",                                # GPIO 7 -> Nút A (gửi lệnh "A UP/DOWN")
-    8: "Extra"                             # GPIO 8 -> Nút dự phòng
+    8: "EXTRA"                             # GPIO 8 -> Nút dự phòng
 }
 
 # --- Cấu hình LoRa ---
@@ -42,6 +42,9 @@ LORA_FREQUENCY = 915                       # Tần số LoRa: 915 MHz
 
 # --- File log ---
 LOG_FILE = "score.txt"                     # File lưu kết quả
+
+# --- xac dinh extra mode co active hay khong.
+extra_mode_active = False
 
 # --- Cấu hình hệ thống tính điểm ---
 # Định nghĩa các vòng điểm: (bán kính tối đa (cm), điểm số)
@@ -521,6 +524,11 @@ def button_callback(channel):
     3. Nếu chưa bấm (False), gửi lệnh "UP" và đổi trạng thái thành True
     4. Nếu đã bấm (True), gửi lệnh "DOWN" và đổi trạng thái thành False
     """
+
+    # add extra active value
+
+    global extra_mode_active
+
     # Debounce: chờ 20ms để đảm bảo đó là bấm thực
     time.sleep(0.02)
     
@@ -529,17 +537,64 @@ def button_callback(channel):
         # Lấy tên Node từ dict BUTTON_PINS
         node_name = BUTTON_PINS[channel]
         
-        # Kiểm tra trạng thái hiện tại của nút
-        if button_states[channel] == False:
-            # Lần bấm đầu tiên: gửi "UP"
-            send_command(node_name, "UP")
-            # Cập nhật trạng thái: đã bấm
-            button_states[channel] = True
+       # ===== KIỂM TRA NẾU EXTRA MODE ĐANG ACTIVE =====
+        if extra_mode_active:
+            # Trong chế độ EXTRA, chỉ nút EXTRA (GPIO 8) có thể hoạt động
+            if channel == 8:  # EXTRA button
+                # Bấm EXTRA lần nữa → Thoát khỏi EXTRA mode
+                extra_mode_active = False
+                
+                # Gửi lệnh EXTRA DOWN
+                send_command("EXTRA", "DOWN")
+                
+                log_data("[CONTROL] EXTRA mode OFF - All buttons unlocked")
+                
+                return
+            else:
+                # Các nút khác bị khóa
+                log_data(f"[WARNING] Button {node_name} is locked (EXTRA mode active)")
+                return
+        
+        # ===== CHẾ ĐỘ BÌNH THƯỜNG (EXTRA không active) =====
+        if node_name == "A":
+            # Nút A: Lệnh broadcast cho tất cả Node
+            if button_states[channel] == False:
+                # Lần bấm đầu tiên: gửi "A UP"
+                send_command("A", "UP")
+                button_states[channel] = True
+            else:
+                # Lần bấm thứ hai: gửi "A DOWN"
+                send_command("A", "DOWN")
+                button_states[channel] = False
+        
+        elif node_name == "Extra":
+            # Nút EXTRA: Khóa tất cả, GPIO luôn HIGH
+            if button_states[channel] == False:
+                # Lần bấm đầu tiên: gửi "EXTRA UP" (khóa tất cả nút)
+                extra_mode_active = True  # ← SET FLAG
+                send_command("EXTRA", "UP")
+                button_states[channel] = True
+                
+                log_data("[CONTROL] EXTRA mode ON - All buttons locked")
+            else:
+                # Lần bấm thứ hai: gửi "EXTRA DOWN"
+                extra_mode_active = False  # ← CLEAR FLAG
+                send_command("EXTRA", "DOWN")
+                button_states[channel] = False
+                
+                log_data("[CONTROL] EXTRA mode OFF - All buttons unlocked")
+        
         else:
-            # Lần bấm thứ hai: gửi "DOWN"
-            send_command(node_name, "DOWN")
-            # Cập nhật trạng thái: chưa bấm
-            button_states[channel] = False
+            # NODE1, NODE2, NODE3, NODE4, NODE5
+            if button_states[channel] == False:
+                # Lần bấm đầu tiên: gửi "UP"
+                send_command(node_name, "UP")
+                button_states[channel] = True
+            else:
+                # Lần bấm thứ hai: gửi "DOWN"
+                send_command(node_name, "DOWN")
+                button_states[channel] = False
+
 
 # --- Thiết lập interrupt cho tất cả các nút bấm ---
 for pin in BUTTON_PINS.keys():
