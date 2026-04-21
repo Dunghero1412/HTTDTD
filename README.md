@@ -9,7 +9,7 @@
 
 ## 📋 Giới Thiệu Dự Án
 
-**HTTDTD** là một hệ thống tính điểm tự động được thiết kế dành cho các trường bắn, sân tập bắn súng thật. Hệ thống sử dụng công nghệ **LoRa** (Long Range) để giao tiếp không dây giữa một bộ điều khiển trung tâm (RPi 5) và 5 bộ máy trạm (RPi Nano 2W), mỗi bộ được lắp đặt ở một bục bắn.
+**HTTDTD** là một hệ thống tính điểm tự động được thiết kế dành cho các trường bắn, sân tập bắn súng thật. Hệ thống sử dụng công nghệ **LoRa** (Long Range) để giao tiếp không dây giữa một bộ điều khiển trung tâm (RPi 5) và 5 bộ máy trạm (RPi Zero 2W), mỗi bộ được lắp đặt ở một bục bắn.
 
 ### 🎯 Tính Năng Chính
 
@@ -152,17 +152,17 @@ dựa trên khoảng cách từ 4 cảm biến
 | Nguồn điện | 5V 3A | Cấp điện cho RPi 5 |
 | Dây USB-UART | CH340 hoặc PL2303 | Kết nối LoRa qua UART 1 |
 
-#### **Node (RPi Nano 2W) - x5 bộ**
+#### **Node (RPi Zero 2W) - x5 bộ**
 | Thành phần | Thông số | Ghi chú |
 |-----------|---------|--------|
-| Raspberry Pi Nano 2W | 512MB RAM | Bộ máy trạm |
+| Raspberry Pi Zero 2W | 512MB RAM | Bộ máy trạm |
 | LoRa Module SX1278 | 915 MHz | Nhận lệnh từ Controller |
 | MCP3204 ADC | 12-bit, 4 kênh | Đọc cảm biến Piezo |
 | Cảm biến Piezoelectric | 4 cảm biến | Phát hiện viên đạn |
 | Op-Amp | TL072 hoặc LM358 | Khuếch đại tín hiệu từ Piezo |
 | Transistor/Relay | 5V | Điều khiển motor/actuator |
 | Motor/Actuator | 5V-12V | Nâng/hạ bia |
-| Nguồn điện | 5V 2A | Cấp điện cho Nano 2W |
+| Nguồn điện | 5V 2A | Cấp điện cho Zero 2W |
 
 ### Phần Mềm
 
@@ -179,7 +179,7 @@ dựa trên khoảng cách từ 4 cảm biến
 - rpi-lora (giao tiếp LoRa)
 ```
 
-#### **Node (RPi Nano 2W)**
+#### **Node (RPi Zero 2W)**
 ```bash
 # OS
 - Raspberry Pi OS Lite Bookworm (32-bit)
@@ -239,7 +239,7 @@ pip3 install RPi.GPIO rpi-lora
 ```
 
 
-## 3. Cài đặt Node ( RPi Nano 2w)
+## 3. Cài đặt Node ( RPi Zero 2W)
 
 #### 1. cài đặt file cơ bản.
 ```bash
@@ -321,7 +321,7 @@ cp controller.py ~/HTTDTD/
 chmod +x ~/HTTDTD/controller.py
 ```
 
-### 3. Cài Đặt Node (RPi Nano 2W)
+### 3. Cài Đặt Node (RPi Zero 2W)
 
 #### **Bước 1: Cập nhật hệ thống**
 ```bash
@@ -390,7 +390,7 @@ python3 controller.py
 ### 2. Khởi Động Các Node
 
 ```bash
-# Trên mỗi RPi Nano 2W
+# Trên mỗi RPi Zero 2W
 cd ~/HTTDTD
 python3 node.py
 ```
@@ -461,7 +461,7 @@ HTTDTD/
 │    ├── CONTROLLER.py       
 │    │  # Code cho RPi 5 (Controller)
 │    ├── NODE.py             
-│    │  # Code cho RPi Nano 2W (Node)
+│    │  # Code cho RPi Zero 2W (Node)
 │    └── SX1728.md           
 │        # File Markdown hướng dẫn setup LoRa module SX1278.
 │
