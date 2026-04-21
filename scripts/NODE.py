@@ -112,6 +112,7 @@ print("="*60)
 control_active = False                     # Trạng thái điều khiển: ON/OFF
 control_timeout = None                     # Thời gian hết hạn điều khiển
 impact_count = 0                           # Đếm số lần phát hiện viên đạn
+extra_mode_active = False                  # trạng thái extra mode
 
 # ==================== HÀM ĐỌC MCP3204 ====================
 
@@ -404,15 +405,19 @@ def send_coordinates(x, y):
         # In lỗi nếu gửi thất bại
         print(f"[ERROR] Failed to send: {e}")
 
-# ==================== HÀM NHẬN LỆNH ====================
+# ==================== HÀM NHẬN LỆNH =====================
 
 def receive_command():
     """
     Nhận lệnh từ Controller qua LoRa
     
     Định dạng lệnh:
-        - "NODE1 UP": Kích hoạt điều khiển
-        - "NODE1 DOWN": Dừng điều khiển
+        - "NODE1 UP": Kích hoạt Node 1 cụ thể (chế độ bình thường)
+        - "NODE1 DOWN": Dừng Node 1 cụ thể
+        - "A UP": Điều khiển tất cả Node (chế độ bình thường)
+        - "A DOWN": Dừng tất cả Node
+        - "EXTRA UP": Khóa tất cả nút, GPIO luôn HIGH (chế độ bảo trì)
+        - "EXTRA DOWN": Thoát khỏi chế độ EXTRA, GPIO về LOW
     
     Hoạt động:
     1. Kiểm tra LoRa có dữ liệu chưa
@@ -422,7 +427,7 @@ def receive_command():
     Trả về:
         str: Trạng thái ("ACTIVATED", "DEACTIVATED") hoặc None
     """
-    global control_active, control_timeout, impact_count
+    global control_active, control_timeout, impact_count, extra_mode_active
 
     try:
         # Kiểm tra xem LoRa có đang nhận dữ liệu không
@@ -447,44 +452,93 @@ def receive_command():
             # Kiểm tra nếu có ít nhất 2 phần
             if len(parts) >= 2:
                 # Lấy tên node và hành động
-                node_command = parts[0].upper()  # "NODE1"
+                node_command = parts[0].upper()  # "NODE1", "A", "EXTRA"
                 action = parts[1].upper()         # "UP" hoặc "DOWN"
 
-                # Kiểm tra nếu lệnh dành cho Node này
-                if node_command == NODE_NAME:
-                    # Nếu hành động là "UP" - kích hoạt
+                # ===== KIỂM TRA LỆNH BROADCAST (A, EXTRA) =====
+                is_broadcast_a = (node_command == "A")
+                is_broadcast_extra = (node_command == "EXTRA")
+                is_for_this_node = (node_command == NODE_NAME)
+
+                # ===== KIỂM TRA LỆNH EXTRA =====
+                if is_broadcast_extra:
                     if action == "UP":
-                        # Đặt trạng thái điều khiển thành ON
-                        control_active = True
-
-                        # Đặt timeout: 60 giây
-                        control_timeout = time.time() + CONTROL_TIMEOUT
-
-                        # Reset counter đếm số lần phát hiện
-                        impact_count = 0
-
-                        # In thông báo
-                        print(f"[CONTROL] Activated for {CONTROL_TIMEOUT}s")
-
-                        # Đưa GPIO 20 lên HIGH (bật motor/actuator)
+                        # EXTRA UP: Khóa tất cả nút, GPIO luôn HIGH
+                        extra_mode_active = True
+                        control_active = False  # Tắt chế độ bình thường
+                        
+                        print(f"[EXTRA] Mode ON - GPIO {CONTROL_PIN} is HIGH")
+                        
+                        # GPIO 20 lên HIGH (sẽ ở đó cho đến khi EXTRA DOWN)
                         GPIO.output(CONTROL_PIN, GPIO.HIGH)
-
-                        # Trả về trạng thái
-                        return "ACTIVATED"
-
-                    # Nếu hành động là "DOWN" - dừng
+                        
+                        return "EXTRA_ON"
+                    
                     elif action == "DOWN":
-                        # Đặt trạng thái điều khiển thành OFF
+                        # EXTRA DOWN: Thoát khỏi chế độ EXTRA, GPIO về LOW
+                        extra_mode_active = False
                         control_active = False
-
-                        # In thông báo
-                        print(f"[CONTROL] Deactivated")
-
-                        # Đưa GPIO 20 về LOW (tắt motor/actuator)
+                        
+                        print(f"[EXTRA] Mode OFF - GPIO {CONTROL_PIN} is LOW")
+                        
+                        # GPIO 20 về LOW
                         GPIO.output(CONTROL_PIN, GPIO.LOW)
+                        
+                        return "EXTRA_OFF"
 
-                        # Trả về trạng thái
+                # ===== KIỂM TRA LỆNH A (CHỈ KHI KHÔNG CÓ EXTRA MODE) =====
+                elif is_broadcast_a and not extra_mode_active:
+                    if action == "UP":
+                        # A UP: Kích hoạt tất cả Node (chế độ bình thường)
+                        control_active = True
+                        control_timeout = time.time() + CONTROL_TIMEOUT
+                        impact_count = 0
+                        
+                        print(f"[CONTROL] BROADCAST A UP - Activated for {CONTROL_TIMEOUT}s")
+                        
+                        GPIO.output(CONTROL_PIN, GPIO.HIGH)
+                        
+                        return "ACTIVATED"
+                    
+                    elif action == "DOWN":
+                        # A DOWN: Dừng tất cả Node
+                        control_active = False
+                        
+                        print(f"[CONTROL] BROADCAST A DOWN - Deactivated")
+                        
+                        GPIO.output(CONTROL_PIN, GPIO.LOW)
+                        
                         return "DEACTIVATED"
+
+                # ===== KIỂM TRA LỆNH CỤ THỂ (NODE1, NODE2, ...) =====
+                # CHỈ HỢP LỆ KHI EXTRA MODE KHÔNG ACTIVE
+                elif is_for_this_node and not extra_mode_active:
+                    if action == "UP":
+                        # Node này UP: Kích hoạt
+                        control_active = True
+                        control_timeout = time.time() + CONTROL_TIMEOUT
+                        impact_count = 0
+                        
+                        print(f"[CONTROL] {node_command} UP - Activated for {CONTROL_TIMEOUT}s")
+                        
+                        GPIO.output(CONTROL_PIN, GPIO.HIGH)
+                        
+                        return "ACTIVATED"
+                    
+                    elif action == "DOWN":
+                        # Node này DOWN: Dừng
+                        control_active = False
+                        
+                        print(f"[CONTROL] {node_command} DOWN - Deactivated")
+                        
+                        GPIO.output(CONTROL_PIN, GPIO.LOW)
+                        
+                        return "DEACTIVATED"
+                
+                # ===== LỆNH KHÔNG HỢP LỆ TRONG EXTRA MODE =====
+                elif extra_mode_active and (is_broadcast_a or is_for_this_node):
+                    print(f"[WARNING] Command {node_command} {action} ignored (EXTRA mode active)")
+                    return None
 
     except Exception as e:
         # In lỗi nếu có vấn đề
@@ -501,11 +555,12 @@ def main():
     
     Hoạt động:
     1. Liên tục kiểm tra LoRa nhận lệnh
-    2. Khi nhận lệnh "UP", bắt đầu phát hiện viên đạn
-    3. Tính tọa độ và gửi về Controller
-    4. Dừng khi nhận lệnh "DOWN" hoặc hết timeout
+    2. Khi nhận lệnh "A UP" hoặc "NODE UP", bắt đầu phát hiện viên đạn
+    3. Khi nhận lệnh "EXTRA UP", GPIO luôn HIGH, không phát hiện
+    4. Tính tọa độ và gửi về Controller
+    5. Dừng khi nhận lệnh DOWN hoặc hết timeout
     """
-    global control_active, control_timeout, impact_count
+    global control_active, control_timeout, impact_count, extra_mode_active
 
     try:
         # Vòng lặp chính - chạy liên tục
@@ -513,8 +568,8 @@ def main():
             # Nhận lệnh từ Controller
             receive_command()
 
-            # Nếu điều khiển đang active
-            if control_active:
+            # ===== CHỈ PHÁT HIỆN KHI EXTRA MODE KHÔNG ACTIVE =====
+            if control_active and not extra_mode_active:
                 # Kiểm tra xem timeout đã hết chưa
                 if time.time() > control_timeout:
                     # Dừng điều khiển
@@ -544,7 +599,8 @@ def main():
                             # In tọa độ
                             print(f"[RESULT] Position: x={x}, y={y}")
 
-                            # Gửi tọa độ về Controller
+                            # Gửi tọa độ về Controller (với CSMA)
+                            wait_for_channel()
                             send_coordinates(x, y)
 
                         # Kiểm tra nếu đã phát hiện được 3 lần
@@ -558,8 +614,14 @@ def main():
                             # In thông báo
                             print("[COMPLETE] Received 3 impacts, deactivating")
 
-            # Delay 10ms để giảm CPU usage
-            time.sleep(0.01)
+            # ===== EXTRA MODE: GPIO LUÔN HIGH, KHÔNG PHÁT HIỆN =====
+            elif extra_mode_active:
+                # GPIO đã ở HIGH, chỉ chờ lệnh EXTRA DOWN
+                # Không làm gì cả - vòng lặp tiếp tục kiểm tra lệnh
+                print("[EXTRA] Waiting for EXTRA DOWN command...")
+                
+            # Delay 100ms để giảm CPU usage
+            time.sleep(0.1)
 
     # Xử lý khi nhấn Ctrl+C
     except KeyboardInterrupt:
