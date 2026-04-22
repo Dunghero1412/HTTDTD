@@ -62,7 +62,7 @@ CONTROL_TIMEOUT = 60                       # Timeout điều khiển: 60 giây
 
 # --- Tên Node (tùy chỉnh cho mỗi Node) ---
 # NODE1, NODE2, NODE3, NODE4, NODE5
-NODE_NAME = "NODE1"
+NODE_NAME = "NODE1A"
 
 # --- Tốc độ âm thanh ---
 # Dùng để tính khoảng cách từ thời gian phát hiện

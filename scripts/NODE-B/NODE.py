@@ -633,7 +633,7 @@ def receive_command():
                 action = parts[1].upper()         # "UP" hoặc "DOWN"
 
                 # ===== KIỂM TRA LỆNH BROADCAST (A, EXTRA) =====
-                is_broadcast_a = (node_command == "A")
+                is_broadcast_b = (node_command == "B")
                 is_broadcast_extra = (node_command == "EXTRA")
                 is_for_this_node = (node_command == NODE_NAME)
 
@@ -664,7 +664,7 @@ def receive_command():
                         return "EXTRA_OFF"
 
                 # ===== KIỂM TRA LỆNH A (CHỈ KHI KHÔNG CÓ EXTRA MODE) =====
-                elif is_broadcast_a and not extra_mode_active:
+                elif is_broadcast_b and not extra_mode_active:
                     if action == "UP":
                         # A UP: Kích hoạt tất cả Node (chế độ bình thường)
                         control_active = True
