@@ -458,27 +458,37 @@ HTTDTD/
 │        # File cài đặt tự động.
 ├── script/                   
 │    │  # Thư mục chứa các script.
-│    ├── CONTROLLER.py       
+│    ├── /CONTROLLER/CONTROLLER.py       
 │    │  # Code cho RPi 5 (Controller)
-│    ├── NODE.py             
-│    │  # Code cho RPi Zero 2W (Node)
+│    ├── NODE-A/NODE.py             
+│    │  # Code cho RPi Zero 2w
+│    │  # Node nhóm A dành cho bia số 4 (bia nằm)
+│    ├── NODE-B/NODE.py             
+│    │  # Code cho RPi Zero 2w
+│    │  # Node nhóm B dành cho bia số 7 (bia quỳ)
+│    ├── NODE-C/NODE.py             
+│    │  # Code cho RPi Zero 2w
+│    │  # Node nhóm C dành cho bia số 8 (bia đứng)
+│    ├── NODE-D/NODE.py             
+│    │  # Code cho RPi Zero 2w
+│    │  # Node nhóm D cho bài 2 AK(cả bia chạy 8c)
 │    └── SX1728.md           
-│        # File Markdown hướng dẫn setup LoRa module SX1278.
+│        # File hướng dẫn setup LoRa module SX1278.
 │
 ├── docs/                     
 │    │  # Tài liệu chi tiết
 │    ├── score.txt           
 │    │  # File log kết quả (tự động tạo)
-│    ├── hardware-setup.md     
-│    │  # Hướng dẫn lắp ráp phần cứng
+│    ├── ~~hardware-setup.md~~     
+│    │  ~~# Hướng dẫn lắp ráp phần cứng~~
 │    ├── wiring-diagram.md     
 │    │  # Sơ đồ đấu nối
 │    ├── wiring_diagram_controller.svg
 │    │  # sơ đồ đấu nối với GUI cho controller
 │    ├── wiring_diagram.svg
 │    │  # sơ đồ đấu nối với GUI cho node
-│    └── calibration.md        
-│        # Hướng dẫn calibrate
+│    └── ~~calibration.md  ~~      
+│        ~~# Hướng dẫn calibrate~~
 ├── html/
 │    │  # gui html cho code.
 │    ├── score_gui.html
