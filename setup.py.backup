@@ -3,30 +3,11 @@
 """
 HTTDTD Setup Script - Hệ Thống Tính Điểm Tự Động Dùng Cho Bắn Súng
 
-Cấu trúc thư mục mới:
-    HTTDTD/
-    ├── scripts/
-    │   ├── CONTROLLER/
-    │   │   └── CONTROLLER.py
-    │   ├── NODE-A/
-    │   │   └── NODE.py
-    │   ├── NODE-B/
-    │   │   └── NODE.py
-    │   ├── NODE-C/
-    │   │   └── NODE.py
-    │   ├── NODE-D/
-    │   │   └── NODE.py
-    │   └── html/
-    │       └── score_gui.html
-
 Cách sử dụng:
-    sudo python3 setup.py install controller
-    sudo python3 setup.py install node 1a
-    sudo python3 setup.py install node 2b
-    sudo python3 setup.py install node 3c
-    sudo python3 setup.py install node 4d
-    sudo python3 setup.py uninstall controller
-    sudo python3 setup.py uninstall node 1a
+    python3 setup.py install controller
+    python3 setup.py install node NODE1
+    python3 setup.py install node NODE2
+    ... etc
 """
 
 import os
@@ -47,12 +28,11 @@ LOG_FILE = INSTALL_PATH / "setup.log"
 # Tên user chạy services
 SERVICE_USER = "pi"
 
-# Các nhóm Node hợp lệ
-VALID_NODE_GROUPS = ["A", "B", "C", "D"]
-
-# Tên file trong các thư mục
+# Tên script trong thư mục scripts
 CONTROLLER_SCRIPT = "CONTROLLER.py"
 NODE_SCRIPT = "NODE.py"
+
+# Tên HTML
 HTML_FILE = "score_gui.html"
 
 # ==================== HÀM HỖ TRỢ ====================
@@ -92,7 +72,7 @@ def run_command(cmd, description=""):
     
     Tham số:
         cmd (str): Lệnh cần chạy
-        description (str): Mô tả
+        description (str): Mô tả (in lên console)
     
     Trả về:
         bool: True nếu thành công, False nếu lỗi
@@ -101,6 +81,7 @@ def run_command(cmd, description=""):
         if description:
             log_message(description)
         
+        # Chạy lệnh với sudo nếu cần
         result = subprocess.run(cmd, shell=True, check=True, 
                               stdout=subprocess.PIPE, 
                               stderr=subprocess.PIPE)
@@ -175,7 +156,10 @@ def copy_file(src, dst, description=""):
         if description:
             log_message(description)
         
+        # Copy file
         shutil.copy2(src, dst)
+        
+        # Đặt quyền
         os.chmod(dst, 0o755)
         os.chown(dst, 1000, 1000)  # UID 1000 = pi
         
@@ -185,69 +169,6 @@ def copy_file(src, dst, description=""):
         log_message(f"Lỗi khi copy file: {e}", "ERROR")
         return False
 
-def parse_node_name(node_name_input):
-    """
-    Parse tên Node từ input
-    
-    Tham số:
-        node_name_input (str): Input từ command line
-                              Ví dụ: "1a", "2b", "NODE1A", "NODE2B"
-    
-    Trả về:
-        tuple: (node_number, node_group, node_full_name)
-               Ví dụ: (1, "A", "NODE1A")
-               hoặc (None, None, None) nếu lỗi
-    """
-    node_input = node_name_input.upper()
-    
-    # Chuẩn hóa: "1A" -> "1A", "NODE1A" -> "1A"
-    if node_input.startswith("NODE"):
-        node_input = node_input[4:]  # Bỏ "NODE"
-    
-    # Parse số và nhóm
-    # "1A" -> số=1, nhóm=A
-    # "2B" -> số=2, nhóm=B
-    
-    try:
-        # Tách số và ký tự
-        node_number = None
-        node_group = None
-        
-        # Tìm vị trí chuyển từ số sang chữ
-        for i, char in enumerate(node_input):
-            if char.isalpha():
-                node_number = int(node_input[:i])
-                node_group = node_input[i:].upper()
-                break
-        
-        # Kiểm tra hợp lệ
-        if node_number is None or node_group is None:
-            log_message(f"Tên Node không hợp lệ: {node_name_input}", "ERROR")
-            log_message("Ví dụ hợp lệ: 1a, 2b, 3c, 4d, NODE1A, NODE2B", "ERROR")
-            return None, None, None
-        
-        # Kiểm tra nhóm
-        if node_group not in VALID_NODE_GROUPS:
-            log_message(f"Nhóm Node không hợp lệ: {node_group}", "ERROR")
-            log_message(f"Nhóm hợp lệ: {', '.join(VALID_NODE_GROUPS)}", "ERROR")
-            return None, None, None
-        
-        # Kiểm tra số
-        if node_number < 1 or node_number > 5:
-            log_message(f"Số Node không hợp lệ: {node_number}", "ERROR")
-            log_message("Số Node phải từ 1 đến 5", "ERROR")
-            return None, None, None
-        
-        # Tên đầy đủ
-        node_full_name = f"NODE{node_number}{node_group}"
-        
-        return node_number, node_group, node_full_name
-    
-    except ValueError:
-        log_message(f"Tên Node không hợp lệ: {node_name_input}", "ERROR")
-        log_message("Ví dụ hợp lệ: 1a, 2b, 3c, 4d", "ERROR")
-        return None, None, None
-
 # ==================== SETUP CONTROLLER ====================
 
 def setup_controller():
@@ -256,7 +177,7 @@ def setup_controller():
     
     Hoạt động:
     1. Copy CONTROLLER.py → /opt/CONTROLLER.py
-    2. Copy html/score_gui.html → /opt/html/score_gui.html
+    2. Copy score_gui.html → /opt/html/score_gui.html
     3. Tạo systemd service: rpi5-controller.service
     4. Enable service và khởi động
     """
@@ -271,7 +192,7 @@ def setup_controller():
     
     # ── Bước 2: Kiểm tra file nguồn ──
     current_dir = Path(__file__).parent
-    controller_src = current_dir / "scripts" / "CONTROLLER" / CONTROLLER_SCRIPT
+    controller_src = current_dir / "scripts" / CONTROLLER_SCRIPT
     html_src = current_dir / "html" / HTML_FILE
     
     if not check_file_exists(controller_src, "CONTROLLER.py"):
@@ -361,29 +282,27 @@ WantedBy=multi-user.target
 
 # ==================== SETUP NODE ====================
 
-def setup_node(node_name_input):
+def setup_node(node_name):
     """
     Cài đặt Node (RPi Nano 2W)
     
     Tham số:
-        node_name_input (str): Tên Node (VD: "1a", "2b", "NODE1A")
+        node_name (str): Tên Node (NODE1, NODE2, ...)
     
     Hoạt động:
-    1. Parse tên Node để lấy số và nhóm
-    2. Copy NODE.py từ thư mục NODE-{GROUP}/NODE.py
-    3. Sửa biến NODE_NAME trong file
-    4. Tạo systemd service
-    5. Enable service và khởi động
+    1. Copy NODE.py → /opt/NODE_[name].py
+    2. Sửa biến NODE_NAME trong file
+    3. Tạo systemd service: rpi-nano-node[name].service
+    4. Enable service và khởi động
     """
     
-    # Parse tên Node
-    node_number, node_group, node_full_name = parse_node_name(node_name_input)
-    
-    if node_full_name is None:
-        return False
+    # Chuẩn hóa tên Node
+    node_name = node_name.upper()
+    if not node_name.startswith("NODE"):
+        node_name = "NODE" + node_name
     
     log_message("=" * 60, "INFO")
-    log_message(f"SETUP NODE - {node_full_name}", "INFO")
+    log_message(f"SETUP NODE - {node_name}", "INFO")
     log_message("=" * 60, "INFO")
     
     # ── Bước 1: Kiểm tra quyền root ──
@@ -392,20 +311,20 @@ def setup_node(node_name_input):
     
     # ── Bước 2: Kiểm tra file nguồn ──
     current_dir = Path(__file__).parent
-    node_src = current_dir / "scripts" / f"NODE-{node_group}" / NODE_SCRIPT
+    node_src = current_dir / "scripts" / NODE_SCRIPT
     
-    if not check_file_exists(node_src, f"NODE.py (nhóm {node_group})"):
+    if not check_file_exists(node_src, "NODE.py"):
         return False
     
     # ── Bước 3: Tạo thư mục cài đặt ──
     if not create_directory(INSTALL_PATH):
         return False
     
-    # ── Bước 4: Copy file và sửa NODE_NAME ──
-    node_dst = INSTALL_PATH / f"NODE_{node_full_name}.py"
+    # ── Bước 4: Copy file ──
+    node_dst = INSTALL_PATH / f"NODE_{node_name}.py"
     
     try:
-        log_message(f"Copy NODE.py từ NODE-{node_group}/ → {node_dst}")
+        log_message(f"Copy NODE.py → {node_dst}")
         
         # Đọc file NODE.py
         with open(node_src, 'r') as f:
@@ -413,16 +332,16 @@ def setup_node(node_name_input):
         
         # Sửa biến NODE_NAME
         # Tìm dòng: NODE_NAME = "NODE1"
-        # Sửa thành: NODE_NAME = "NODE1A" (hoặc tên khác)
+        # Sửa thành: NODE_NAME = "NODE2" (hoặc tên khác)
         old_pattern = 'NODE_NAME = "NODE1"'
-        new_pattern = f'NODE_NAME = "{node_full_name}"'
+        new_pattern = f'NODE_NAME = "{node_name}"'
         
         if old_pattern not in content:
             log_message(f"Không tìm thấy '{old_pattern}' trong file", "WARNING")
             log_message("Sẽ copy file nguyên bản mà không sửa NODE_NAME", "WARNING")
         else:
             content = content.replace(old_pattern, new_pattern)
-            log_message(f"Sửa NODE_NAME → {node_full_name}", "SUCCESS")
+            log_message(f"Sửa NODE_NAME → {node_name}", "SUCCESS")
         
         # Ghi file tại /opt
         with open(node_dst, 'w') as f:
@@ -439,9 +358,9 @@ def setup_node(node_name_input):
         return False
     
     # ── Bước 5: Tạo systemd service ──
-    service_name = f"rpi-nano-{node_full_name.lower()}.service"
+    service_name = f"rpi-nano-{node_name.lower()}.service"
     service_content = f"""[Unit]
-Description=RPi Nano 2W Shooting Range {node_full_name}
+Description=RPi Nano 2W Shooting Range {node_name}
 After=network.target
 
 [Service]
@@ -489,7 +408,7 @@ WantedBy=multi-user.target
     
     # ── Hoàn thành ──
     log_message("=" * 60, "SUCCESS")
-    log_message(f"NODE {node_full_name} ĐÃ ĐƯỢC CÀI ĐẶT THÀNH CÔNG!", "SUCCESS")
+    log_message(f"NODE {node_name} ĐÃ ĐƯỢC CÀI ĐẶT THÀNH CÔNG!", "SUCCESS")
     log_message("=" * 60, "SUCCESS")
     log_message(f"📍 Node script: {node_dst}", "INFO")
     log_message(f"📍 Service: {service_name}", "INFO")
@@ -540,24 +459,22 @@ def uninstall_controller():
     log_message("Controller đã được gỡ cài đặt", "SUCCESS")
     return True
 
-def uninstall_node(node_name_input):
+def uninstall_node(node_name):
     """
     Gỡ cài đặt Node
     """
-    # Parse tên Node
-    node_number, node_group, node_full_name = parse_node_name(node_name_input)
-    
-    if node_full_name is None:
-        return False
+    node_name = node_name.upper()
+    if not node_name.startswith("NODE"):
+        node_name = "NODE" + node_name
     
     log_message("=" * 60, "WARNING")
-    log_message(f"UNINSTALL NODE - {node_full_name}", "WARNING")
+    log_message(f"UNINSTALL NODE - {node_name}", "WARNING")
     log_message("=" * 60, "WARNING")
     
     if not check_root():
         return False
     
-    service_name = f"rpi-nano-{node_full_name.lower()}.service"
+    service_name = f"rpi-nano-{node_name.lower()}.service"
     
     # Dừng service
     run_command(f"systemctl stop {service_name}", "Dừng service")
@@ -575,14 +492,14 @@ def uninstall_node(node_name_input):
     run_command("systemctl daemon-reload", "Reload systemd daemon")
     
     # Xóa node file
-    node_path = INSTALL_PATH / f"NODE_{node_full_name}.py"
+    node_path = INSTALL_PATH / f"NODE_{node_name}.py"
     try:
         node_path.unlink()
         log_message(f"Xóa: {node_path}", "SUCCESS")
     except:
         log_message(f"Không thể xóa: {node_path}", "WARNING")
     
-    log_message(f"Node {node_full_name} đã được gỡ cài đặt", "SUCCESS")
+    log_message(f"Node {node_name} đã được gỡ cài đặt", "SUCCESS")
     return True
 
 # ==================== MAIN ====================
@@ -595,25 +512,12 @@ def main():
         description="HTTDTD Setup - Hệ Thống Tính Điểm Tự Động Dùng Cho Bắn Súng",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Cấu trúc thư mục:
-  HTTDTD/
-  ├── scripts/
-  │   ├── CONTROLLER/CONTROLLER.py
-  │   ├── NODE-A/NODE.py
-  │   ├── NODE-B/NODE.py
-  │   ├── NODE-C/NODE.py
-  │   ├── NODE-D/NODE.py
-  │   └── html/score_gui.html
-  └── setup.py
-
 Ví dụ sử dụng:
   sudo python3 setup.py install controller
-  sudo python3 setup.py install node 1a
-  sudo python3 setup.py install node 2b
-  sudo python3 setup.py install node 3c
-  sudo python3 setup.py install node 4d
+  sudo python3 setup.py install node NODE1
+  sudo python3 setup.py install node 2
   sudo python3 setup.py uninstall controller
-  sudo python3 setup.py uninstall node 1a
+  sudo python3 setup.py uninstall node NODE1
         """
     )
     
@@ -633,7 +537,7 @@ Ví dụ sử dụng:
         'node_name',
         nargs='?',
         default=None,
-        help='Tên Node khi cài đặt node (VD: 1a, 2b, 3c, 4d)'
+        help='Tên Node khi cài đặt node (VD: NODE1, NODE2, hoặc chỉ 1, 2)'
     )
     
     args = parser.parse_args()
@@ -648,7 +552,7 @@ Ví dụ sử dụng:
     elif args.target == 'node':
         if args.node_name is None:
             log_message("Lỗi: Cần chỉ định tên Node", "ERROR")
-            log_message("Ví dụ: sudo python3 setup.py install node 1a", "ERROR")
+            log_message("Ví dụ: sudo python3 setup.py install node NODE1", "ERROR")
             return 1
         
         if args.action == 'install':

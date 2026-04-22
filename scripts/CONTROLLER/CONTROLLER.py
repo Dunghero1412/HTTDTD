@@ -28,13 +28,14 @@ BAUD_RATE = 57600                          # Tốc độ baud 57600 bps , đúng
 # --- Cấu hình GPIO cho các nút bấm ---
 # Các nút được nối vào GPIO 2-8 trên RPi 5
 BUTTON_PINS = {
-    2: "NODE1",                            # GPIO 2 -> Node 1
-    3: "NODE2",                            # GPIO 3 -> Node 2
-    4: "NODE3",                            # GPIO 4 -> Node 3
-    5: "NODE4",                            # GPIO 5 -> Node 4
-    6: "NODE5",                            # GPIO 6 -> Node 5
-    7: "A",                                # GPIO 7 -> Nút A (gửi lệnh "A UP/DOWN")
-    8: "EXTRA"                             # GPIO 8 -> Nút dự phòng
+    2: "NODE1",                            # GPIO 2  -> Node 1
+    3: "NODE2",                            # GPIO 3  -> Node 2
+    4: "NODE3",                            # GPIO 4  -> Node 3
+    5: "NODE4",                            # GPIO 5  -> Node 4
+    6: "NODE5",                            # GPIO 6  -> Node 5
+    7: "A",                                # GPIO 7  -> Nút A (gửi lệnh "A UP/DOWN")
+    8: "EXTRA"                             # GPIO 8  -> bao bia
+    17:"B"				   # GPIO 17 -> Node class B
 }
 
 # --- Cấu hình LoRa ---
