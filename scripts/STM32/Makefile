@@ -17,7 +17,7 @@ CFLAGS += -Wall -Wextra
 INCLUDES = -I./src -I./lib
 
 # ✓ Source files
-SOURCES = src/main.c src/system.c src/gpio.c src/timer.c src/spi.c src/uart.c
+SOURCES = src/main.c src/system.c src/gpio.c src/timmer.c src/spi.c src/uart.c
 OBJECTS = $(SOURCES:.c=.o)
 
 # ✓ Output

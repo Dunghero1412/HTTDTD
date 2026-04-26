@@ -8,8 +8,8 @@
  * 4. Disable HSI (High Speed Internal) để tiết kiệm power
  */
 
-#include "stm32f407xx.h"
-#include "config.h"
+#include "../inc/stm32f407xx.h"
+#include "../inc/config.h"
 
 // ✓ System core clock (được fill bởi SystemClock_Config)
 uint32_t SystemCoreClock = SYSTEM_CLOCK_HZ;

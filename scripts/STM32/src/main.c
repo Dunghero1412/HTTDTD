@@ -36,11 +36,11 @@
  * ============================================================================
  */
 
-#include "stm32f4xx.h"
-#include "system.h"
-#include "gpio.h"
-#include "timmer.h"
-#include "spi.h"
+#include "../inc/stm32f4xx.h"
+#include "../inc/system.h"
+#include "../inc/gpio.h"
+#include "../inc/timmer.h"
+#include "../inc/spi.h"
 
 #include <stdint.h>
 #include <string.h>

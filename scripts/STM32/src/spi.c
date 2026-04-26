@@ -27,8 +27,8 @@
  *   [12..15] : timestamp CH4
  */
 
-#include "spi.h"
-#include "stm32f4xx.h"
+#include "../inc/spi.h"
+#include "../inc/stm32f4xx.h"
 #include <string.h>
 
 /* ------------------------------------------------------------------ */

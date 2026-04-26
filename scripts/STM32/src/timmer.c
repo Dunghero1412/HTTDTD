@@ -21,8 +21,8 @@
  *   extern volatile uint8_t  g_capture_done;  (= 1 khi đủ 4 kênh)
  */
 
-#include "timmer.h"
-#include "stm32f4xx.h"
+#include "../inc/timmer.h"
+#include "../inc/stm32f4xx.h"
 
 /* ------------------------------------------------------------------ */
 /* Shared capture data (dùng trong main.c / tdoa.c)                    */
