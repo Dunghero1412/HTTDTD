@@ -252,64 +252,42 @@ HYPERBOLIC_TOLERANCE = 1e-6
 # Dùng để review lịch sử sau đó
 LOG_FILE = "score.txt"
 
-# ==================== KHỞI TẠO GPIO ====================
+# ==================== KHỞI TẠO HARDWARE ====================
+# Khai báo trước, khởi tạo trong setup() để tránh crash khi import
+spi  = None
+lora = None
 
-# ✓ Thiết lập chế độ GPIO
-# GPIO.BCM = sử dụng Broadcom pin numbering (GPIO17, GPIO20, v.v.)
-# Nếu dùng GPIO.BOARD = sử dụng pin header numbering (1, 2, 3, ...)
-GPIO.setmode(GPIO.BCM)
+def setup():
+    """
+    Khởi tạo toàn bộ phần cứng: GPIO, SPI, LoRa.
+    Gọi một lần duy nhất từ main() sau khi kiểm tra hardware sẵn sàng.
+    Tách khỏi module level để tránh crash khi import trên máy không có GPIO.
+    """
+    global spi, lora
 
-# ✓ Tắt cảnh báo GPIO
-# Nếu bật → sẽ in warning khi setup pin lần 2
-# Tắt để tránh spam console
-GPIO.setwarnings(False)
+    # ── GPIO ──────────────────────────────────────────────────
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
 
-# === Setup DATA_READY pin ===
+    # DATA_READY: input, dùng edge detection thay vì polling
+    GPIO.setup(DATA_READY_PIN, GPIO.IN)
 
-# ✓ Cấu hình GPIO17 là INPUT
-# Nhận tín hiệu từ STM32 (PB0 kéo HIGH/LOW)
-GPIO.setup(DATA_READY_PIN, GPIO.IN)
+    # CONTROL: output, mặc định LOW
+    GPIO.setup(CONTROL_PIN, GPIO.OUT)
+    GPIO.output(CONTROL_PIN, GPIO.LOW)
+    print(f"[INIT] GPIO ready (DATA_READY=GPIO{DATA_READY_PIN}, CTRL=GPIO{CONTROL_PIN})")
 
-# === Setup CONTROL pin ===
+    # ── SPI ───────────────────────────────────────────────────
+    spi = spidev.SpiDev()
+    spi.open(SPI_BUS, SPI_DEVICE)
+    spi.max_speed_hz = SPI_SPEED
+    spi.mode = 0b00              # Mode 0 (CPOL=0, CPHA=0) khớp STM32
+    print(f"[INIT] SPI ready at {SPI_SPEED / 1e6:.1f}MHz (mode 0)")
 
-# ✓ Cấu hình GPIO20 là OUTPUT
-# Kéo HIGH = bật motor, LOW = tắt motor
-GPIO.setup(CONTROL_PIN, GPIO.OUT)
-
-# ✓ Đặt GPIO20 về LOW ban đầu (motor tắt)
-GPIO.output(CONTROL_PIN, GPIO.LOW)
-
-# ==================== KHỞI TẠO SPI ====================
-
-# ✓ Tạo object SPI
-# spidev.SpiDev() = interface đến kernel SPI driver
-spi = spidev.SpiDev()
-
-# ✓ Mở SPI device
-# spi.open(bus, device) = /dev/spidev0.0
-# Bus 0 = SPI0 (RPi Nano 2W chỉ có SPI0)
-# Device 0 = CE0 (GPIO8, chip select 0)
-spi.open(SPI_BUS, SPI_DEVICE)
-
-# ✓ Đặt tốc độ SPI
-# 10.5MHz = phải khớp với STM32
-spi.max_speed_hz = SPI_SPEED
-
-# ✓ In log khởi tạo
-print(f"[INIT] SPI initialized at {SPI_SPEED / 1e6:.1f}MHz")
-
-# ==================== KHỞI TẠO LoRa ====================
-
-# ✓ Tạo object LoRa
-# BOARD.CN1 = config pins mặc định cho RPi (định nghĩa trong board_config)
-lora = LoRa(BOARD.CN1, BOARD.CN1)
-
-# ✓ Đặt tần số LoRa
-# 915 MHz = ISM band (phổ công cộng)
-lora.set_frequency(LORA_FREQ)
-
-# ✓ In log khởi tạo
-print(f"[INIT] LoRa initialized at {LORA_FREQ}MHz")
+    # ── LoRa ──────────────────────────────────────────────────
+    lora = LoRa(BOARD.CN1, BOARD.CN1)
+    lora.set_frequency(LORA_FREQ)
+    print(f"[INIT] LoRa ready at {LORA_FREQ}MHz")
 
 # ==================== BIẾN TRẠNG THÁI ====================
 
@@ -475,194 +453,117 @@ def read_stm32_timestamps():
 
 def wait_for_data_ready(timeout=2.0):
     """
-    Chờ DATA_READY signal từ STM32
-    
-    🔧 HOẠT ĐỘNG:
-    1. Vòng lặp: kiểm tra GPIO17 mỗi 1ms
-    2. Nếu GPIO17 = HIGH → dữ liệu sẵn sàng, return True
-    3. Nếu timeout → return False
-    
-    💡 MỤC ĐÍCH:
-    - Tránh polling liên tục (lỗ CPU usage)
-    - Chỉ đọc SPI khi STM32 có dữ liệu sẵn sàng
-    - Giảm latency (không cần delay cố định)
-    
-    📊 TIMING:
-    - STM32 capture: nanosecond
-    - STM32 kéo PB0 HIGH: ~1μs
-    - RPi nhận interrupt: ~1-10μs
-    - RPi đọc GPIO: ~10-100μs
-    - Total: ~10-100μs (rất nhanh!)
-    
+    Chờ DATA_READY signal từ STM32 bằng GPIO edge detection.
+
+    Dùng GPIO.wait_for_edge() thay vì polling 1ms để:
+    - Không miss signal ngắn (STM32 có thể kéo HIGH/LOW trong <1ms)
+    - Giải phóng CPU hoàn toàn trong lúc chờ (không busy-wait)
+    - Chính xác hơn polling interval 1ms
+
     Tham số:
-        timeout (float): Thời gian chờ tối đa (giây)
-                        Default: 2.0 (nếu không có DATA_READY → timeout)
-    
+        timeout (float): Thời gian chờ tối đa (giây). Default: 2.0
+
     Trả về:
-        bool: True nếu nhận được DATA_READY (GPIO17 = HIGH)
-              False nếu timeout hoặc lỗi
+        bool: True nếu nhận được rising edge trên GPIO17
+              False nếu timeout
     """
-    
-    # ✓ Ghi nhận thời gian bắt đầu
     start_time = time.time()
-    
-    # ✓ Vòng lặp: chờ GPIO17 chuyển từ LOW → HIGH
-    while time.time() - start_time < timeout:
-        # ✓ Kiểm tra GPIO17 (DATA_READY)
-        # GPIO.HIGH = 1 (3.3V)
-        # GPIO.LOW = 0 (0V)
-        if GPIO.input(DATA_READY_PIN) == GPIO.HIGH:
-            # ✓ In log khi nhận được signal
-            print(f"[DATA_READY] Signal received after {(time.time() - start_time)*1000:.2f}ms")
-            
-            # ✓ Nhỏ delay để STM32 hoàn tất chuẩn bị dữ liệu
-            # (mặc dù bình thường data đã sẵn sàng)
-            time.sleep(0.001)  # 1ms
-            
-            # ✓ Return True (signal nhận được)
-            return True
-        
-        # ✓ Delay nhỏ để tránh busy-waiting (CPU lúc lúc được nghỉ)
-        # 1ms polling interval = poll mỗi 1ms
-        # Nếu giảm xuống 0.1ms → CPU usage cao, nhưng timing chính xác hơn
-        # Nếu tăng lên 10ms → CPU usage thấp, nhưng có thể miss signal
-        time.sleep(0.001)
-    
-    # ❌ Hết timeout mà vẫn không nhận được DATA_READY
-    print(f"[ERROR] DATA_READY timeout ({timeout}s)")
+
+    # Nếu GPIO17 đang HIGH sẵn (STM32 đã kéo trước khi ta chờ)
+    if GPIO.input(DATA_READY_PIN) == GPIO.HIGH:
+        print(f"[DATA_READY] Signal already HIGH")
+        return True
+
+    # Chờ rising edge với timeout (ms) - không tốn CPU
+    timeout_ms = int(timeout * 1000)
+    channel = GPIO.wait_for_edge(DATA_READY_PIN, GPIO.RISING,
+                                  timeout=timeout_ms)
+
+    if channel is not None:
+        elapsed = (time.time() - start_time) * 1000
+        print(f"[DATA_READY] Rising edge after {elapsed:.2f}ms")
+        return True
+
+    print(f"[TIMEOUT] No DATA_READY in {timeout:.1f}s")
     return False
 
 def detect_impact():
     """
-    Phát hiện viên đạn tác động vào bia (STM32 version)
-    
-    🔧 HOẠT ĐỘNG:
-    1. In log "Waiting for DATA_READY signal..."
-    2. Gọi wait_for_data_ready() để chờ signal
-    3. Nếu signal nhận được (HIGH):
-       a. Gọi read_stm32_timestamps() để đọc SPI
-       b. Return dict với 4 timestamp
-    4. Nếu timeout hoặc lỗi:
-       a. In log "[MISS] No impact detected"
-       b. Return None
-    
-    💡 KHÁC BIỆT SO VỚI MCP3204:
-    
-    Cũ (MCP3204):
-    - Vòng lặp 50ms, đọc ADC từng kênh (~40ms)
-    - Trễ: 40-50ms
-    - Sai số: 5-10cm
-    
-    Mới (STM32):
-    - Chờ interrupt (DATA_READY)
-    - Trễ: <1ms
-    - Sai số: 0.1-0.2cm (50x tốt hơn!)
-    
+    Phát hiện viên đạn tác động vào bia (STM32 version).
+
+    Timeout ngắn (0.1s) để không block main loop quá lâu.
+    Nếu không có DATA_READY trong 0.1s → return None ngay,
+    main loop tiếp tục nhận lệnh LoRa và kiểm tra timeout.
+
     Trả về:
-        dict: Thời gian phát hiện của mỗi sensor (giây, TDOA format)
-              {'A': 0.0, 'B': 0.0005952, 'C': 0.0008929, 'D': 0.0011906}
-              (Sensor A = 0.0 làm tham chiếu)
-        None: Nếu timeout hoặc không phát hiện được
+        dict: {'A': 0.0, 'B': Δt_B, 'C': Δt_C, 'D': Δt_D} (giây)
+        None: Nếu timeout hoặc lỗi
     """
-    
-    # ✓ In log: bắt đầu chờ
-    print("[SENSOR] Waiting for DATA_READY signal...")
-    
-    # ✓ Chờ DATA_READY signal từ STM32
-    # wait_for_data_ready() return True/False
-    # Timeout = SENSOR_DETECTION_WINDOW × 10 (để có buffer)
-    if wait_for_data_ready(timeout=SENSOR_DETECTION_WINDOW * 10):
-        # ✓ Signal nhận được, đọc dữ liệu từ STM32 qua SPI
+    # Timeout ngắn: 100ms đủ để không miss đạn nhưng không block lâu
+    if wait_for_data_ready(timeout=0.1):
         detections = read_stm32_timestamps()
-        
-        # ✓ Nếu parse thành công (không return None)
         if detections:
-            # ✓ Return dict timestamps
             return detections
-    
-    # ❌ Timeout hoặc lỗi
-    print("[MISS] No impact detected")
+
     return None
 
 def triangulation_weighted_average(detections):
     """
-    BƯỚC 1: Ước tính nhanh bằng Weighted Average
-    
-    🔧 HOẠT ĐỘNG:
-    1. Khởi tạo tọa độ = trung bình tọa độ 4 sensor
-    2. Lặp 10 lần:
-       a. Tính trọng số cho mỗi sensor (weight = 1/time)
-       b. Điều chỉnh tọa độ hướng về sensor có trọng số cao
-    3. Giới hạn trong phạm vi bia (-50 đến 50 cm)
-    4. Return tọa độ ước tính
-    
-    💡 NGUYÊN LÝ:
-    - Sensor phát hiện sớm (time nhỏ) → gần viên đạn → weight cao
-    - Sensor phát hiện muộn (time lớn) → xa viên đạn → weight thấp
-    - Dùng weight để "kéo" ước tính về phía sensor gần
-    
-    ⚡ TÍNH NĂNG:
-    - Rất nhanh: 1-2ms
-    - Độ chính xác: ~90% (so với thực tế)
-    - Ổn định với nhiễu
-    
-    Tham số:
-        detections (dict): TDOA - thời gian phát hiện của mỗi sensor
-                          {'A': 0.0, 'B': 0.0005952, 'C': 0.0008929, 'D': 0.0011906}
-    
-    Trả về:
-        tuple: (x, y) - tọa độ ước tính (cm)
+    BƯỚC 1: Ước tính nhanh bằng Weighted Average.
+
+    FIX so với phiên bản cũ:
+    - Sensor A luôn có detections['A'] = 0 → weight = 1/0.0001 = 10000
+      kéo kết quả về vị trí sensor A, sai lớn.
+    - Fix: dùng khoảng cách âm thanh đã tính (Δd = Δt × c) làm trọng số
+      nghịch đảo. Sensor nào có Δd nhỏ nhất → gần đạn nhất → weight cao.
+    - Với Sensor A (tham chiếu, Δt=0): dùng khoảng cách Euclidean từ
+      điểm ước tính đến sensor A làm weight.
+
+    Nguyên lý:
+      weight_A = 1 / (d_estimated_to_A + epsilon)
+      weight_X = 1 / (|Δd_X| + epsilon)   với X = B, C, D
     """
-    
-    # ✓ Khởi tạo tọa độ ban đầu = trung bình tọa độ 4 sensor
-    # Giúp convergence nhanh hơn (không phải bắt từ (0,0))
-    # x = (-50 + -50 + 50 + 50) / 4 = 0
-    # y = (-50 + 50 + 50 + -50) / 4 = 0
-    x = sum(pos[0] for pos in SENSOR_POSITIONS.values()) / 4
-    y = sum(pos[1] for pos in SENSOR_POSITIONS.values()) / 4
-    
-    # ✓ In log: vị trí ban đầu
+    SOUND_SPEED_CMS = SOUND_SPEED * 100   # cm/s
+
+    # Khởi tạo tại tâm bia (0,0) — không thiên lệch về sensor nào
+    x = 0.0
+    y = 0.0
+
     print(f"[HYBRID-STEP1] Weighted Average - Initial: ({x:.2f}, {y:.2f})")
 
-    # ✓ Lặp WEIGHTED_AVG_ITERATIONS lần (mặc định 10 lần) để tinh chỉnh
     for iteration in range(WEIGHTED_AVG_ITERATIONS):
-        # ✓ Tính tổng trọng số (để chuẩn hóa sau)
-        # Mục đích: đảm bảo tổng weight = 1 (prevent drift)
-        # sum(1/detections[s]) với tất cả s (A, B, C, D)
-        total_weight = sum(1 / (detections[s] + 0.0001) 
-                          for s in SENSOR_POSITIONS.keys())
-        
-        # ✓ Cập nhật tọa độ từ mỗi sensor
-        for sensor_name, (sx, sy) in SENSOR_POSITIONS.items():
-            # ✓ Tính trọng số chuẩn hóa
-            # weight = (1 / time) / sum_of_all_weights
-            # Kết quả: weight là một phân số từ 0 đến 1
-            # Nếu time nhỏ → weight lớn (gần viên đạn)
-            weight = (1 / (detections[sensor_name] + 0.0001)) / total_weight
-            
-            # ✓ Vector hướng từ vị trí hiện tại (x, y) tới sensor (sx, sy)
-            # dx = sx - x: khoảng cách theo trục X
-            # dy = sy - y: khoảng cách theo trục Y
-            dx = sx - x
-            dy = sy - y
-            
-            # ✓ Cập nhật tọa độ theo hướng sensor
-            # Công thức: x_new = x + (sx - x) × weight × learning_rate
-            # learning_rate kiểm soát tốc độ hội tụ
-            # 0.15 = mỗi lần lặp điều chỉnh 15% khoảng cách
-            x += dx * weight * WEIGHTED_AVG_LEARNING_RATE
-            y += dy * weight * WEIGHTED_AVG_LEARNING_RATE
+        # Tính khoảng cách từ điểm hiện tại đến từng sensor
+        dist = {s: math.sqrt((x - sx)**2 + (y - sy)**2)
+                for s, (sx, sy) in SENSOR_POSITIONS.items()}
 
-    # ✓ Giới hạn tọa độ trong phạm vi bia (-50 đến 50 cm)
-    # Mục đích: tránh giá trị ngoài lệ do lỗi tính toán
-    # max(-50, min(50, x)) = giữ x trong [-50, 50]
+        # Tính weight dựa trên chênh lệch khoảng cách âm thanh đo được
+        # Sensor X phát hiện sau A → âm thanh đi thêm Δd = Δt × c
+        # → điểm đạn cách A ít hơn X khoảng Δd
+        weights = {}
+        for s in SENSOR_POSITIONS:
+            if s == 'A':
+                # Sensor A: weight từ khoảng cách ước tính đến A
+                weights[s] = 1.0 / (dist[s] + 1e-6)
+            else:
+                delta_d = detections[s] * SOUND_SPEED_CMS  # cm
+                weights[s] = 1.0 / (abs(delta_d) + 1e-6)
+
+        total_weight = sum(weights.values())
+
+        # Weighted average position
+        x_new = sum(weights[s] * SENSOR_POSITIONS[s][0]
+                    for s in SENSOR_POSITIONS) / total_weight
+        y_new = sum(weights[s] * SENSOR_POSITIONS[s][1]
+                    for s in SENSOR_POSITIONS) / total_weight
+
+        # Smooth update với learning rate để tránh oscillation
+        x = x + (x_new - x) * WEIGHTED_AVG_LEARNING_RATE
+        y = y + (y_new - y) * WEIGHTED_AVG_LEARNING_RATE
+
     x = max(-50, min(50, x))
     y = max(-50, min(50, y))
-    
-    # ✓ In log: vị trí cuối cùng sau Weighted Average
+
     print(f"[HYBRID-STEP1] Weighted Average - Final: ({x:.2f}, {y:.2f})")
-    
-    # ✓ Return tuple (x, y)
     return x, y
 
 def triangulation_hyperbolic_refinement(detections, x_init, y_init):
@@ -739,21 +640,18 @@ def triangulation_hyperbolic_refinement(detections, x_init, y_init):
         # ✓ Tính sai số cho mỗi cặp sensor (A-B, A-C, A-D)
         errors = []
         for sensor_name in ['B', 'C', 'D']:
-            # ✓ Hiệu khoảng cách từ vị trí ước tính (theoretical)
-            # d_A - d_B = khoảng cách từ (x,y) đến A - khoảng cách từ (x,y) đến B
-            d_A = distances['A']
+            d_A      = distances['A']
             d_sensor = distances[sensor_name]
-            diff_theoretical = d_A - d_sensor
-            
-            # ✓ Hiệu khoảng cách từ thời gian (measured)
+
+            # Lý thuyết: viên đạn cách sensor_X xa hơn A một khoảng Δd
+            # → d_sensor - d_A = Δt × c  (sign đúng)
+            diff_theoretical = d_sensor - d_A
+
+            # Measured: Δd = Δt × c (Δt đã chuẩn hóa, A=0)
             diff_measured = distance_diffs_measured[sensor_name]
-            
-            # ✓ Sai số = lý thuyết - thực tế
-            # Mục đích: minimize tổng bình phương các sai số này
-            error = diff_theoretical - diff_measured
-            errors.append(error)
-        
-        # ✓ Return array sai số
+
+            errors.append(diff_theoretical - diff_measured)
+
         return errors
     
     # ✓ Gọi scipy.optimize.least_squares để tìm vị trí tối ưu
@@ -1126,46 +1024,14 @@ def receive_command():
 
 def main():
     """
-    Vòng lặp chính của Node
-    
-    🔧 HOẠT ĐỘNG:
-    1. In banner khởi động
-    2. Vòng lặp vô tận:
-       a. Nhận lệnh từ Controller
-       b. Nếu control_active:
-          - Kiểm tra timeout
-          - Phát hiện viên đạn (chờ DATA_READY)
-          - Tính toán tọa độ (Hybrid method)
-          - Gửi tọa độ về Controller
-          - Đếm viên (tối đa 3 viên)
-       c. Delay 100ms để giảm CPU
-    
-    💡 FLOW:
-    Control OFF (nhận lệnh UP)
-         ↓
-    Control ON (GPIO20 = HIGH)
-         ↓
-    Chờ DATA_READY (viên đạn tác động)
-         ↓
-    Đọc SPI (20 bytes timestamp)
-         ↓
-    Tính toán TDOA + Triangulation (Hybrid)
-         ↓
-    Gửi tọa độ qua LoRa
-         ↓
-    impact_count++
-    
-    Nếu impact_count >= 3:
-        Control OFF (GPIO20 = LOW)
-    
-    Nếu timeout (60s):
-        Control OFF (GPIO20 = LOW)
+    Vòng lặp chính của Node.
     """
-    
     global control_active, control_timeout, impact_count, extra_mode_active
 
     try:
-        # ✓ In banner khởi động
+        # ── Khởi tạo hardware ─────────────────────────────────
+        setup()
+
         print("="*60)
         print(f"NODE STARTED - {NODE_NAME}")
         print("="*60)
