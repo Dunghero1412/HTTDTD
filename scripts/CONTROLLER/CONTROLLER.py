@@ -114,70 +114,63 @@ LOG_FILE = "score.txt"
 extra_mode_active = False
 
 # === CẤU HÌNH HỆ THỐNG TÍNH ĐIỂM ===
-# Định nghĩa các vòng điểm: (bán kính tối đa (cm), điểm số)
-# Bia hình tròn 100cm × 100cm, tâm ở (0, 0)
+# Bia tròn 10 vòng đồng tâm, mỗi vòng rộng 7.5cm, tâm ở (0,0)
+# (radius_max_cm, điểm)
 SCORING_RINGS = [
-    (7.5, 10),                             # Vòng 1: Bullseye (0-7.5cm) → 10 điểm
-    (15, 9),                               # Vòng 2 (7.5-15cm) → 9 điểm
-    (22.5, 8),                             # Vòng 3 (15-22.5cm) → 8 điểm
-    (30, 7),                               # Vòng 4 (22.5-30cm) → 7 điểm
-    (37.5, 6),                             # Vòng 5 (30-37.5cm) → 6 điểm
-    (45, 5),                               # Vòng 6 (37.5-45cm) → 5 điểm
-    (50, 4),                               # Vòng 7 (45-50cm) → 4 điểm
-    (float('inf'), 0)                      # Ngoài bia (>50cm) → 0 điểm
+    (7.5,  10),   # Vòng 10 – Bullseye
+    (15.0,  9),   # Vòng 9
+    (22.5,  8),   # Vòng 8
+    (30.0,  7),   # Vòng 7
+    (37.5,  6),   # Vòng 6
+    (45.0,  5),   # Vòng 5
+    (52.5,  4),   # Vòng 4
+    (60.0,  3),   # Vòng 3
+    (67.5,  2),   # Vòng 2
+    (75.0,  1),   # Vòng 1
+    (float('inf'), 0),  # Ngoài bia
 ]
 
-# Bán kính tối đa của bia (cm)
-MAX_RADIUS = 50
+# Bán kính tối đa của bia (cm) – vòng 1 ngoài cùng
+MAX_RADIUS = 75
 
 # Timeout điều khiển: 60 giây
 # Sau khi bấm nút UP, nếu hết 60s mà không nhận đủ 3 viên → tự động OFF
 CONTROL_TIMEOUT = 60
 
-# ==================== KHỞI TẠO GPIO ====================
+# ==================== KHỞI TẠO HARDWARE ====================
+# Khai báo trước, khởi tạo trong setup() để tránh crash khi import
+lora = None
 
-# ✓ Sử dụng chế độ BCM (Broadcom) để đặt tên GPIO
-# BCM: Sử dụng số BCM (GPIO2, GPIO3, ...) thay vì số vật lý trên header
-GPIO.setmode(GPIO.BCM)
+def setup():
+    """
+    Khởi tạo GPIO và LoRa. Gọi một lần từ main().
+    Tách khỏi module level để handle lỗi hardware sạch hơn.
+    """
+    global lora
 
-# ✓ Tắt cảnh báo GPIO
-# Tránh in ra console những cảnh báo không cần thiết
-GPIO.setwarnings(False)
+    # ── GPIO ──────────────────────────────────────────────────
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
 
-# === Khởi tạo từng nút bấm ===
-# Dict để lưu trạng thái hiện tại của mỗi nút
-# False = chưa bấm / đã release, True = đang bấm / đã active
-button_states = {}
+    for pin in BUTTON_PINS.keys():
+        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        button_states[pin] = False
 
-# ✓ Duyệt qua tất cả các pin nút bấm
-for pin in BUTTON_PINS.keys():
-    # ✓ Cấu hình pin là INPUT (nhập dữ liệu từ nút)
-    # pull_up_down=GPIO.PUD_UP: Khi nút thả → GPIO = HIGH (~3.3V)
-    # Khi nút bấm → GPIO = LOW (~0V) kết nối tới GND
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    
-    # ✓ Khởi tạo trạng thái nút là False (chưa bấm)
-    button_states[pin] = False
+    # Thiết lập interrupt — không sleep trong callback, dùng bouncetime
+    for pin in BUTTON_PINS.keys():
+        GPIO.add_event_detect(pin, GPIO.FALLING,
+                              callback=button_callback, bouncetime=200)
+    print(f"[INIT] GPIO ready ({len(BUTTON_PINS)} buttons)")
 
-# ==================== KHỞI TẠO LoRa ====================
-
-# ✓ Khởi tạo LoRa module
-# BOARD.CN1: Cấu hình pin mặc định cho LoRa
-# baud=BAUD_RATE: Đặt tốc độ baud UART
-try:
-    lora = LoRa(BOARD.CN1, BOARD.CN1, baud=BAUD_RATE)
-    
-    # ✓ Đặt tần số LoRa
-    # Phải khớp với tần số của tất cả Node
-    lora.set_frequency(LORA_FREQUENCY)
-    
-    # ✓ In thông báo khởi tạo thành công
-    print(f"[INIT] LoRa initialized at {LORA_FREQUENCY}MHz")
-
-except Exception as e:
-    # ❌ Nếu lỗi khởi tạo, in lỗi và thoát
-    print(f"[ERROR] Failed to initialize LoRa: {e}")
-    sys.exit(1)
+    # ── LoRa ──────────────────────────────────────────────────
+    try:
+        lora = LoRa(BOARD.CN1, BOARD.CN1, baud=BAUD_RATE)
+        lora.set_frequency(LORA_FREQUENCY)
+        print(f"[INIT] LoRa ready at {LORA_FREQUENCY}MHz")
+    except Exception as e:
+        print(f"[ERROR] LoRa init failed: {e}")
+        GPIO.cleanup()
+        sys.exit(1)
 
 # ==================== HÀM HỖ TRỢ ====================
 
@@ -318,58 +311,32 @@ def receive_data():
 
 def parse_node_data(data):
     """
-    Phân tích dữ liệu nhận từ Node
-    
-    🔧 HOẠT ĐỘNG:
-    1. Tách dữ liệu bằng dấu phẩy (,)
-    2. Trích xuất tên Node (phần đầu)
-    3. Chuyển đổi x, y thành float
-    4. Kiểm tra nếu lỗi
-    5. Trả về tuple (node_name, x, y)
-    
-    📝 ĐỊNH DẠNG DỮ LIỆU:
-    Đầu vào:  "NODE1, -26, 30"
-    Đầu ra:   ("NODE1", -26.0, 30.0)
-    
-    📝 TRƯỜNG HỢP ĐẶC BIỆT:
-    Nếu Node bắn miss (ngoài bia):
-    Đầu vào:  "NODE1, -200, -200"
-    Đầu ra:   ("NODE1", -200.0, -200.0)
-    Controller sẽ nhận diện đây là miss khi tính điểm
-    
-    Tham số:
-        data (str): Dữ liệu nhận từ Node
-                   Ví dụ: "NODE1, -26, 30"
-    
-    Trả về:
-        tuple: (node_name, x, y)
-               Ví dụ: ("NODE1", -26.0, 30.0)
-               hoặc (None, None, None) nếu lỗi
+    Phân tích dữ liệu nhận từ Node.
+
+    Định dạng: "NODE1A, -26.3, 30.1"
+    Trả về:   ("NODE1", -26.3, 30.1)
+
+    FIX: Chuẩn hóa tên node về dạng NODE1..NODE5
+         bằng cách bỏ suffix loại bia (A/B/C...).
+         Dùng except cụ thể thay vì bare except.
     """
-    
     try:
-        # ✓ Tách dữ liệu bằng dấu phẩy (,)
-        # "NODE1, -26, 30" → ["NODE1", " -26", " 30"]
         parts = data.split(',')
-        
-        # ✓ Lấy phần tên Node (phần đầu) và loại bỏ khoảng trắng
-        # parts[0] = "NODE1" hoặc " NODE1 " → strip() → "NODE1"
-        node_name = parts[0].strip()
-        
-        # ✓ Chuyển đổi phần x thành số float
-        # parts[1] = " -26" → strip() → "-26" → float() → -26.0
+        if len(parts) < 3:
+            return (None, None, None)
+
+        # Chuẩn hóa: "NODE1A" → "NODE1", "NODE 2B" → "NODE2"
+        raw_name = parts[0].strip().upper().replace(" ", "")
+        # Giữ lại phần "NODE" + chữ số, bỏ suffix chữ cái sau cùng
+        import re
+        match = re.match(r'(NODE\d+)', raw_name)
+        node_name = match.group(1) if match else raw_name
+
         x = float(parts[1].strip())
-        
-        # ✓ Chuyển đổi phần y thành số float
-        # parts[2] = " 30" → strip() → "30" → float() → 30.0
         y = float(parts[2].strip())
-        
-        # ✓ Trả về tuple (node_name, x, y)
         return (node_name, x, y)
-    
-    except:
-        # ❌ Nếu lỗi khi phân tích (dữ liệu không hợp lệ)
-        # Trả về tuple (None, None, None)
+
+    except (ValueError, IndexError, AttributeError):
         return (None, None, None)
 
 # ==================== HÀM TÍNH ĐIỂM ====================
@@ -408,119 +375,32 @@ def calculate_distance(x, y):
 
 def get_ring(distance):
     """
-    Xác định vòng điểm dựa trên khoảng cách
-    
-    🔧 HOẠT ĐỘNG:
-    1. Duyệt qua danh sách SCORING_RINGS
-    2. Tìm vòng đầu tiên có radius > distance
-    3. Trả về số vòng tương ứng
-    4. Nếu không tìm thấy (vượt bia) → trả về 0
-    
-    📊 BẢNG VÒNG ĐIỂM:
-    Vòng 1: 0-7.5cm → 10 điểm
-    Vòng 2: 7.5-15cm → 9 điểm
-    Vòng 3: 15-22.5cm → 8 điểm
-    Vòng 4: 22.5-30cm → 7 điểm
-    Vòng 5: 30-37.5cm → 6 điểm
-    Vòng 6: 37.5-45cm → 5 điểm
-    Vòng 7: 45-50cm → 4 điểm
-    Ngoài bia: >50cm → 0 điểm (vòng 0)
-    
-    Tham số:
-        distance (float): Khoảng cách từ tâm (cm)
-    
-    Trả về:
-        int: Số vòng (1-7) hoặc 0 nếu ngoài bia
+    Xác định số điểm dựa trên khoảng cách từ tâm.
+    Trả về (score, ring_name).
     """
-    
-    # ✓ Duyệt qua các vòng để tìm vòng tương ứng
-    # enumerate(SCORING_RINGS, 1): Bắt đầu numbering từ 1
-    # ring_num = 1, 2, 3, ... (số thứ tự)
-    # (radius, score) = tuple từ SCORING_RINGS
-    for ring_num, (radius, _) in enumerate(SCORING_RINGS, 1):
-        # ✓ Kiểm tra nếu distance <= radius
-        # Nếu có → điểm này thuộc vòng này
+    for radius, score in SCORING_RINGS:
         if distance <= radius:
-            # ✓ Trả về số vòng
-            return ring_num
-    
-    # ✓ Nếu không tìm thấy (vượt bia) → trả về 0
-    return 0
+            if score == 0:
+                return 0, "Ngoài bia"
+            return score, f"Vòng {score}"
+    return 0, "Ngoài bia"
+
 
 def calculate_score(x, y):
     """
-    Tính điểm dựa trên tọa độ viên đạn
-    
-    🔧 HOẠT ĐỘNG:
-    1. Tính khoảng cách từ tâm bằng calculate_distance()
-    2. Xác định vòng điểm bằng get_ring()
-    3. Lấy điểm số từ SCORING_RINGS
-    4. Lấy tên vòng từ dict ring_names
-    5. Trả về dict kết quả đầy đủ
-    
-    📊 KẾT QUẢ:
-    {
-        'score': điểm số (0-10),
-        'distance': khoảng cách từ tâm (cm),
-        'ring': số vòng (0-7),
-        'ring_name': tên vòng (string),
-        'x': tọa độ X,
-        'y': tọa độ Y
-    }
-    
-    Ví dụ:
-    - Nhập: x=-2, y=3
-    - Khoảng cách: 3.6cm
-    - Vòng: 1 (Bullseye)
-    - Điểm: 10
-    
-    Tham số:
-        x (float): Tọa độ X (-50 đến 50 cm, hoặc -200 nếu miss)
-        y (float): Tọa độ Y (-50 đến 50 cm, hoặc -200 nếu miss)
-    
-    Trả về:
-        dict: Kết quả tính điểm đầy đủ
+    Tính điểm dựa trên tọa độ viên đạn.
+
+    Trả về dict: score, distance, ring_name, x, y
     """
-    
-    # ✓ Tính khoảng cách từ tâm
     distance = calculate_distance(x, y)
-    
-    # ✓ Xác định vòng điểm
-    ring = get_ring(distance)
-    
-    # ✓ Lấy điểm số từ SCORING_RINGS
-    if ring > 0 and ring <= len(SCORING_RINGS):
-        # ring = 1 → SCORING_RINGS[0][1] = điểm vòng 1
-        # ring = 2 → SCORING_RINGS[1][1] = điểm vòng 2, v.v.
-        score = SCORING_RINGS[ring - 1][1]
-    else:
-        # Vòng 0 (ngoài bia) → 0 điểm
-        score = 0
-    
-    # ✓ Dict tên các vòng
-    ring_names = {
-        0: "Ngoài bia",                    # Vòng 0 (ngoài bia)
-        1: "Bullseye",                     # Vòng 1 (10 điểm)
-        2: "Vòng 2",                       # Vòng 2 (9 điểm)
-        3: "Vòng 3",                       # Vòng 3 (8 điểm)
-        4: "Vòng 4",                       # Vòng 4 (7 điểm)
-        5: "Vòng 5",                       # Vòng 5 (6 điểm)
-        6: "Vòng 6",                       # Vòng 6 (5 điểm)
-        7: "Vòng 7"                        # Vòng 7 (4 điểm)
-    }
-    
-    # ✓ Lấy tên vòng từ dict
-    # dict.get(key, default) → lấy giá trị, nếu không có → "Lỗi"
-    ring_name = ring_names.get(ring, "Lỗi")
-    
-    # ✓ Trả về dict kết quả đầy đủ
+    score, ring_name = get_ring(distance)
+
     return {
-        'score': score,                    # Điểm số (0-10)
-        'distance': round(distance, 2),    # Khoảng cách (làm tròn 2 chữ số)
-        'ring': ring,                      # Số vòng (0-7)
-        'ring_name': ring_name,            # Tên vòng (string)
-        'x': x,                            # Tọa độ X (lưu lại)
-        'y': y                             # Tọa độ Y (lưu lại)
+        'score':    score,
+        'distance': round(distance, 2),
+        'ring_name': ring_name,
+        'x': x,
+        'y': y,
     }
 
 # ==================== LỚP HIỂN THỊ DỮ LIỆU ====================
@@ -701,41 +581,30 @@ class ScoreDisplay:
     
     def reset_round(self):
         """
-        Reset dữ liệu cho vòng bắn mới
-        
-        🔧 HOẠT ĐỘNG:
-        1. Duyệt qua tất cả Node
-        2. Kiểm tra nếu Node chưa nhận đủ 3 viên
-        3. Thêm viên miss (0 điểm) cho những viên thiếu
-        4. Ghi log thông báo miss
-        5. Cập nhật JSON
-        
-        💡 MỤC ĐÍCH:
-        - Đảm bảo tất cả Node có đủ 3 viên bắn
-        - Nếu Node không bắn 3 viên trong thời gian → coi là miss
-        - Tính tổng điểm của vòng (tối đa 3 viên)
+        Pad miss cho những viên thiếu rồi clear shots cho vòng tiếp theo.
+
+        FIX: Sau khi pad, lưu tổng điểm vào history rồi clear shots[],
+             tránh điểm vòng cũ bị cộng dồn vào vòng mới.
         """
-        
-        # ✓ Duyệt qua tất cả Node
         for node_key in self.scores.keys():
-            # ✓ Nếu chưa nhận đủ 3 viên, thêm 0 điểm
-            # while loop tiếp tục cho đến khi shots có đúng 3 phần tử
+            # Pad viên miss còn thiếu
             while len(self.scores[node_key]["shots"]) < 3:
-                # ✓ Thêm viên miss (0 điểm)
                 self.scores[node_key]["shots"].append({
-                    'x': None,                            # Tọa độ X (không biết)
-                    'y': None,                            # Tọa độ Y (không biết)
-                    'score': 0,                           # Điểm số = 0
-                    'ring': 'Miss',                       # Tên vòng = Miss
-                    'distance': None                      # Khoảng cách (không biết)
+                    'x': None, 'y': None,
+                    'score': 0, 'ring': 'Miss', 'distance': None
                 })
-                
-                # ✓ Ghi log thông báo miss
-                log_data(f"[MISS] {node_key}: Viên bắn thứ "
-                        f"{len(self.scores[node_key]['shots'])} thiếu - 0 điểm")
-        
-        # ✓ Cập nhật JSON sau khi thêm các viên miss
+                log_data(f"[MISS] {node_key}: viên "
+                         f"{len(self.scores[node_key]['shots'])} – 0 điểm")
+
         self.save_to_json()
+
+        # Clear cho vòng bắn tiếp theo
+        for node_key in self.scores.keys():
+            self.scores[node_key]["shots"]     = []
+            self.scores[node_key]["x"]         = None
+            self.scores[node_key]["y"]         = None
+            self.scores[node_key]["score"]     = None
+            self.scores[node_key]["ring_name"] = None
     
     def get_total_score(self, node_key):
         """
@@ -854,171 +723,86 @@ class ScoreDisplay:
         # ✓ In dòng kẻ cuối
         print("="*80 + "\n")
 
-# ✓ Tạo đối tượng để hiển thị điểm
-display = ScoreDisplay()
-
-# ==================== XỬ LÝ SỰ KIỆN NÚT BẤM ====================
+# ==================== VÒNG LẶP CHÍNH ====================
 
 def button_callback(channel):
     """
-    Callback function khi nút bấm được kích hoạt
-    
-    🔧 HOẠT ĐỘNG:
-    1. Debounce (chống rung): chờ 20ms
-    2. Kiểm tra xem EXTRA mode có active không
-    3. Nếu EXTRA active:
-       - Chỉ nút EXTRA (GPIO 8) có thể hoạt động
-       - Nút khác bị khóa
-    4. Nếu không EXTRA:
-       - Kiểm tra loại nút (A, EXTRA, NODE1-5)
-       - Toggle trạng thái: False→True (UP), True→False (DOWN)
-       - Gửi lệnh tương ứng
-    
-    💡 LOGIC TOGGLE:
-    - Lần bấm 1: state = False → gửi "UP" → state = True
-    - Lần bấm 2: state = True → gửi "DOWN" → state = False
-    - Lần bấm 3: state = False → gửi "UP" → state = True, ...
-    
-    Tham số:
-        channel (int): GPIO pin số của nút được bấm
-                      Ví dụ: 2, 3, 4, 5, 6, 7, 8, 17
-    """
-    
-    # ✓ Khai báo global để sửa đổi biến trạng thái
-    global extra_mode_active
-    
-    # ✓ Debounce: chờ 20ms để đảm bảo đó là bấm thực
-    # Mục đích: tránh "bounce" (rung lên rung xuống) của nút cơ
-    time.sleep(0.02)
-    
-    # ✓ Kiểm tra lại trạng thái pin sau khi debounce
-    # GPIO.LOW = 0V = nút được bấm
-    # GPIO.HIGH = 3.3V = nút được thả
-    if GPIO.input(channel) == GPIO.LOW:
-        
-        # ✓ Lấy tên Node từ dict BUTTON_PINS
-        # Ví dụ: channel=2 → BUTTON_PINS[2] = "NODE1"
-        node_name = BUTTON_PINS[channel]
-        
-        # ===== KIỂM TRA NẾU EXTRA MODE ĐANG ACTIVE =====
-        if extra_mode_active:
-            # ✓ Trong chế độ EXTRA, chỉ nút EXTRA (GPIO 8) có thể hoạt động
-            if channel == 8:
-                # ✓ Bấm EXTRA lần nữa → Thoát khỏi EXTRA mode
-                extra_mode_active = False
-                
-                # ✓ Gửi lệnh EXTRA DOWN
-                send_command("EXTRA", "DOWN")
-                
-                # ✓ Ghi log
-                log_data("[CONTROL] EXTRA mode OFF - All buttons unlocked")
-                
-                return
-            else:
-                # ✓ Các nút khác bị khóa
-                log_data(f"[WARNING] Button {node_name} is locked "
-                        f"(EXTRA mode active)")
-                return
-        
-        # ===== CHẾ ĐỘ BÌNH THƯỜNG (EXTRA không active) =====
-        
-        # ✓ Nút A: Lệnh broadcast cho tất cả Node
-        if node_name == "A":
-            if button_states[channel] == False:
-                # ✓ Lần bấm đầu tiên: gửi "A UP"
-                send_command("A", "UP")
-                # ✓ Cập nhật trạng thái thành True
-                button_states[channel] = True
-            else:
-                # ✓ Lần bấm thứ hai: gửi "A DOWN"
-                send_command("A", "DOWN")
-                # ✓ Cập nhật trạng thái thành False
-                button_states[channel] = False
-        
-        # ✓ Nút EXTRA: Khóa tất cả, chế độ bảo trì
-        elif node_name == "EXTRA":
-            if button_states[channel] == False:
-                # ✓ Lần bấm đầu tiên: gửi "EXTRA UP" (khóa tất cả nút)
-                extra_mode_active = True  # ← SET FLAG
-                send_command("EXTRA", "UP")
-                button_states[channel] = True
-                
-                log_data("[CONTROL] EXTRA mode ON - All buttons locked")
-            else:
-                # ✓ Lần bấm thứ hai: gửi "EXTRA DOWN"
-                extra_mode_active = False  # ← CLEAR FLAG
-                send_command("EXTRA", "DOWN")
-                button_states[channel] = False
-                
-                log_data("[CONTROL] EXTRA mode OFF - All buttons unlocked")
-        
-        # ✓ Nút B: Loại bia B (hình chữ nhật 150×42cm)
-        elif node_name == "B":
-            if button_states[channel] == False:
-                # ✓ Lần bấm đầu tiên: gửi "B UP"
-                send_command("B", "UP")
-                button_states[channel] = True
-            else:
-                # ✓ Lần bấm thứ hai: gửi "B DOWN"
-                send_command("B", "DOWN")
-                button_states[channel] = False
-        
-        # ✓ NODE1, NODE2, NODE3, NODE4, NODE5
-        else:
-            if button_states[channel] == False:
-                # ✓ Lần bấm đầu tiên: gửi "UP"
-                send_command(node_name, "UP")
-                button_states[channel] = True
-            else:
-                # ✓ Lần bấm thứ hai: gửi "DOWN"
-                send_command(node_name, "DOWN")
-                button_states[channel] = False
+    Callback khi nút bấm được kích hoạt (GPIO FALLING edge).
 
-# === Thiết lập interrupt cho tất cả các nút bấm ===
-# Interrupt = ngắt (khi sự kiện xảy ra, tự động gọi callback)
-for pin in BUTTON_PINS.keys():
-    # ✓ Thêm event detect:
-    # - pin: GPIO pin
-    # - GPIO.FALLING: phát hiện khi GPIO từ HIGH → LOW (bấm nút)
-    # - callback: hàm sẽ gọi khi phát hiện sự kiện
-    # - bouncetime: ignore bounce trong 50ms
-    GPIO.add_event_detect(pin, GPIO.FALLING, 
-                          callback=button_callback, bouncetime=50)
+    FIX: Bỏ time.sleep(0.02) trong callback — sleep trong interrupt context
+         block thread GPIO và có thể miss event khác. Debounce đã được
+         xử lý bởi bouncetime=200 trong add_event_detect().
+    """
+    global extra_mode_active
+
+    # Kiểm tra lại sau edge (loại bỏ false trigger)
+    if GPIO.input(channel) != GPIO.LOW:
+        return
+
+    node_name = BUTTON_PINS[channel]
+
+    # ── EXTRA mode active: chỉ nút EXTRA được phép ────────────
+    if extra_mode_active:
+        if channel == 8:
+            extra_mode_active = False
+            send_command("EXTRA", "DOWN")
+            log_data("[CONTROL] EXTRA mode OFF")
+        else:
+            log_data(f"[WARNING] {node_name} locked (EXTRA mode active)")
+        return
+
+    # ── Chế độ bình thường ────────────────────────────────────
+    if node_name == "A":
+        if not button_states[channel]:
+            send_command("A", "UP")
+            button_states[channel] = True
+        else:
+            send_command("A", "DOWN")
+            button_states[channel] = False
+
+    elif node_name == "EXTRA":
+        if not button_states[channel]:
+            extra_mode_active = True
+            send_command("EXTRA", "UP")
+            button_states[channel] = True
+            log_data("[CONTROL] EXTRA mode ON")
+        else:
+            extra_mode_active = False
+            send_command("EXTRA", "DOWN")
+            button_states[channel] = False
+            log_data("[CONTROL] EXTRA mode OFF")
+
+    elif node_name == "B":
+        if not button_states[channel]:
+            send_command("B", "UP")
+            button_states[channel] = True
+        else:
+            send_command("B", "DOWN")
+            button_states[channel] = False
+
+    else:  # NODE1 .. NODE5
+        if not button_states[channel]:
+            send_command(node_name, "UP")
+            button_states[channel] = True
+        else:
+            send_command(node_name, "DOWN")
+            button_states[channel] = False
+
+# ==================== BIẾN TRẠNG THÁI NÚT BẤM ====================
+button_states = {}  # Khởi tạo trong setup()
 
 # ==================== VÒNG LẶP CHÍNH ====================
 
 def main():
-    """
-    Vòng lặp chính của Controller
-    
-    🔧 HOẠT ĐỘNG:
-    1. Ghi log khi chương trình bắt đầu
-    2. Liên tục nhận dữ liệu từ các Node
-    3. Phân tích dữ liệu nhận được
-    4. Cập nhật điểm vào display
-    5. Hiển thị bảng điểm lên console
-    6. Delay 100ms để giảm CPU usage
-    7. Xử lý lỗi nếu có
-    8. Dọn dẹp trước khi thoát
-    
-    💡 FLOW:
-    while True:
-        ↓ receive_data() - nhận từ Node
-        ↓ parse_node_data() - phân tích
-        ↓ display.update() - cập nhật
-        ↓ display.display() - hiển thị
-        ↓ time.sleep(0.1) - chờ 100ms
-        ↑ lặp lại
-    """
-    
-    # ✓ Ghi log dòng kẻ
-    log_data("="*80)
-    
-    # ✓ Ghi log thông báo bắt đầu
+    """Vòng lặp chính của Controller."""
+
+    # ── Khởi tạo hardware ─────────────────────────────────────
+    setup()
+    display = ScoreDisplay()
+
+    log_data("=" * 80)
     log_data("CONTROLLER STARTED - RPi 5")
-    
-    # ✓ Ghi log dòng kẻ
-    log_data("="*80)
+    log_data("=" * 80)
     
     try:
         # ✓ Vòng lặp chính - chạy liên tục cho đến khi người dùng nhấn Ctrl+C
