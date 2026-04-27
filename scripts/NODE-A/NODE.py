@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-RPi Nano 2W Node - Sử dụng STM32F407 Thay MCP3204
+RPi Zero 2W Node - Sử dụng STM32F407 Thay MCP3204
 
 🎯 MỤC ĐÍCH CHÍNH:
 1. Chờ tín hiệu DATA_READY từ STM32 (GPIO17)
@@ -10,7 +10,7 @@ RPi Nano 2W Node - Sử dụng STM32F407 Thay MCP3204
 4. Tính toán tọa độ viên đạn bằng Hybrid method
 5. Gửi tọa độ về Controller qua LoRa
 
-📍 PIN ASSIGNMENT (RPi Nano 2W - BCM mode):
+📍 PIN ASSIGNMENT (RPi Zero 2W - BCM mode):
 ┌─────────────────────────────────────────────┐
 │ GPIO17 (BCM) → DATA_READY input (STM32 PB0) │
 │ GPIO20 (BCM) → CONTROL output (motor relay) │
@@ -114,6 +114,13 @@ import numpy as np
 # - Dùng để tinh chỉnh tọa độ từ Weighted Average
 from scipy.optimize import least_squares
 
+# ✓ Thư viện đọc cảm biến BME280 qua I2C
+# Cài đặt: pip install adafruit-circuitpython-bme280
+# Dùng để đọc nhiệt độ môi trường → tính SOUND_SPEED động
+import board
+import busio
+import adafruit_bme280.advanced as adafruit_bme280
+
 # ==================== CẤU HÌNH CHUNG ====================
 
 # === CẤU HÌNH GPIO CHO DATA_READY ===
@@ -195,13 +202,35 @@ NODE_NAME = "NODE1A"
 
 # === TỐC ĐỘ ÂM THANH ===
 
-# ✓ Vận tốc âm thanh: 340 m/s
-# Ở nhiệt độ 15°C, độ ẩm bình thường
-# Công thức TDOA: Δd = Δt × c
-# Δd: chênh lệch khoảng cách (cm)
-# Δt: chênh lệch thời gian (s)
-# c: vận tốc âm thanh (cm/s)
-SOUND_SPEED = 340
+# ✓ Công thức tính vận tốc âm thanh theo nhiệt độ (Celsius):
+#   c = 331.3 × √(1 + T/273.15)  (m/s)
+# Ví dụ:
+#   T=0°C   → c = 331.3 m/s
+#   T=20°C  → c = 343.2 m/s
+#   T=35°C  → c = 352.0 m/s
+# Sai số khi dùng hằng số 340 m/s ở 35°C: ~12m/s → ~3.5%
+# → Sai số vị trí ~1-3 cm, đủ để ảnh hưởng điểm số vòng sát nhau
+
+def calc_sound_speed(temp_celsius: float) -> float:
+    """Tính vận tốc âm thanh (m/s) theo nhiệt độ Celsius."""
+    return 331.3 * math.sqrt(1.0 + temp_celsius / 273.15)
+
+# ✓ Giá trị mặc định fallback khi chưa đọc được BME280
+SOUND_SPEED_DEFAULT = 340.0   # m/s
+
+# ✓ Biến động – cập nhật mỗi 60s từ BME280
+# Đây là biến toàn cục, triangulation_hyperbolic_refinement dùng trực tiếp
+sound_speed = SOUND_SPEED_DEFAULT   # m/s (sẽ được cập nhật trong update_sound_speed)
+
+# === CẤU HÌNH BME280 ===
+
+# ✓ Địa chỉ I2C của BME280
+# SDO → GND : 0x76 (mặc định)
+# SDO → VCC : 0x77
+BME280_I2C_ADDR = 0x76
+
+# ✓ Chu kỳ cập nhật nhiệt độ (giây)
+BME280_UPDATE_INTERVAL = 60
 
 # === CẤU HÌNH STM32 TIMESTAMP ===
 
@@ -214,10 +243,11 @@ STM32_CLK_FREQ = 168e6
 # Ví dụ: 168 ticks = 168 × 5.95ns = 1000ns = 1μs
 TICK_TO_SECONDS = 1.0 / STM32_CLK_FREQ
 
-# ✓ Chuyển đổi từ tick → cm (bonus, để hiểu rõ hơn)
-# Công thức: 1 tick = (1/168MHz) × 340m/s × 100cm/m
-# = 5.95ns × 34000 cm/s = 0.202 mm/tick
-TICK_TO_CM = SOUND_SPEED * 100 * TICK_TO_SECONDS
+# ✓ Chuyển đổi từ tick → cm
+# Công thức: 1 tick = (1/168MHz) × c(m/s) × 100cm/m
+# TICK_TO_CM được tính lại mỗi khi sound_speed cập nhật
+# Giá trị ban đầu dùng SOUND_SPEED_DEFAULT
+TICK_TO_CM = SOUND_SPEED_DEFAULT * 100 * TICK_TO_SECONDS
 
 # === CẤU HÌNH HYBRID TRIANGULATION ===
 
@@ -259,11 +289,11 @@ lora = None
 
 def setup():
     """
-    Khởi tạo toàn bộ phần cứng: GPIO, SPI, LoRa.
+    Khởi tạo toàn bộ phần cứng: GPIO, SPI, LoRa, BME280.
     Gọi một lần duy nhất từ main() sau khi kiểm tra hardware sẵn sàng.
     Tách khỏi module level để tránh crash khi import trên máy không có GPIO.
     """
-    global spi, lora
+    global spi, lora, bme280_sensor
 
     # ── GPIO ──────────────────────────────────────────────────
     GPIO.setmode(GPIO.BCM)
@@ -288,6 +318,70 @@ def setup():
     lora = LoRa(BOARD.CN1, BOARD.CN1)
     lora.set_frequency(LORA_FREQ)
     print(f"[INIT] LoRa ready at {LORA_FREQ}MHz")
+
+    # ── BME280 (I2C) ──────────────────────────────────────────
+    try:
+        i2c = busio.I2C(board.SCL, board.SDA)
+        bme280_sensor = adafruit_bme280.Adafruit_BME280_I2C(
+            i2c, address=BME280_I2C_ADDR
+        )
+        # Đọc lần đầu ngay khi khởi động
+        temp = bme280_sensor.temperature
+        _apply_sound_speed(temp)
+        print(f"[INIT] BME280 ready – T={temp:.1f}°C → "
+              f"sound_speed={sound_speed:.2f} m/s")
+    except Exception as e:
+        bme280_sensor = None
+        print(f"[WARN] BME280 init failed: {e} – dùng fallback {SOUND_SPEED_DEFAULT} m/s")
+
+    # ── Khởi động thread cập nhật nhiệt độ định kỳ ───────────
+    import threading
+    t = threading.Thread(target=_sound_speed_update_loop, daemon=True)
+    t.start()
+    print(f"[INIT] Sound speed update thread started (interval={BME280_UPDATE_INTERVAL}s)")
+
+
+# ── BME280 helpers ────────────────────────────────────────────
+
+# Object sensor – khởi tạo trong setup()
+bme280_sensor = None
+
+
+def _apply_sound_speed(temp_celsius: float):
+    """Tính và cập nhật biến sound_speed + TICK_TO_CM từ nhiệt độ."""
+    global sound_speed, TICK_TO_CM
+    sound_speed = calc_sound_speed(temp_celsius)
+    TICK_TO_CM  = sound_speed * 100 * TICK_TO_SECONDS
+
+
+def update_sound_speed() -> float | None:
+    """
+    Đọc nhiệt độ từ BME280 và cập nhật sound_speed.
+
+    Trả về nhiệt độ (°C) nếu thành công, None nếu lỗi.
+    Khi lỗi: giữ nguyên giá trị sound_speed trước đó (không reset về default).
+    """
+    global bme280_sensor
+    if bme280_sensor is None:
+        return None
+    try:
+        temp = bme280_sensor.temperature
+        _apply_sound_speed(temp)
+        print(f"[BME280] T={temp:.1f}°C → sound_speed={sound_speed:.2f} m/s")
+        return temp
+    except Exception as e:
+        print(f"[WARN] BME280 read error: {e} – giữ sound_speed={sound_speed:.2f} m/s")
+        return None
+
+
+def _sound_speed_update_loop():
+    """
+    Thread chạy nền, cập nhật sound_speed mỗi BME280_UPDATE_INTERVAL giây.
+    Dùng daemon=True để tự thoát khi main thread kết thúc.
+    """
+    while True:
+        time.sleep(BME280_UPDATE_INTERVAL)
+        update_sound_speed()
 
 # ==================== BIẾN TRẠNG THÁI ====================
 
@@ -523,7 +617,7 @@ def triangulation_weighted_average(detections):
       weight_A = 1 / (d_estimated_to_A + epsilon)
       weight_X = 1 / (|Δd_X| + epsilon)   với X = B, C, D
     """
-    SOUND_SPEED_CMS = SOUND_SPEED * 100   # cm/s
+    SOUND_SPEED_CMS = sound_speed * 100   # cm/s – cập nhật từ BME280
 
     # Khởi tạo tại tâm bia (0,0) — không thiên lệch về sensor nào
     x = 0.0
@@ -600,9 +694,9 @@ def triangulation_hyperbolic_refinement(detections, x_init, y_init):
     # ✓ In log: bắt đầu Hyperbolic refinement
     print(f"[HYBRID-STEP2] Hyperbolic Refinement - Starting from ({x_init:.2f}, {y_init:.2f})")
     
-    # ✓ Tốc độ âm thanh (đơn vị cm/s)
-    # 340 m/s = 34000 cm/s
-    SOUND_SPEED_CMS = SOUND_SPEED * 100
+    # ✓ Tốc độ âm thanh (cm/s) – dùng giá trị động từ BME280
+    # sound_speed được cập nhật mỗi 60s bởi _sound_speed_update_loop()
+    SOUND_SPEED_CMS = sound_speed * 100
     
     # ✓ Định nghĩa hàm residual (sai số)
     # scipy.optimize.least_squares sẽ minimize hàm này
