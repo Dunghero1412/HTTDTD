@@ -314,24 +314,18 @@ def parse_node_data(data):
     Phân tích dữ liệu nhận từ Node.
 
     Định dạng: "NODE1A, -26.3, 30.1"
-    Trả về:   ("NODE1", -26.3, 30.1)
+    Trả về:   ("NODE1A", -26.3, 30.1)
 
-    FIX: Chuẩn hóa tên node về dạng NODE1..NODE5
-         bằng cách bỏ suffix loại bia (A/B/C...).
-         Dùng except cụ thể thay vì bare except.
+    Giữ nguyên tên đầy đủ (NODE1A, NODE2B, NODE3C...) để
+    ScoreDisplay phân biệt đúng từng node theo dãy bia.
     """
     try:
         parts = data.split(',')
         if len(parts) < 3:
             return (None, None, None)
 
-        # Chuẩn hóa: "NODE1A" → "NODE1", "NODE 2B" → "NODE2"
-        raw_name = parts[0].strip().upper().replace(" ", "")
-        # Giữ lại phần "NODE" + chữ số, bỏ suffix chữ cái sau cùng
-        import re
-        match = re.match(r'(NODE\d+)', raw_name)
-        node_name = match.group(1) if match else raw_name
-
+        # Chuẩn hóa khoảng trắng và chữ hoa, giữ nguyên suffix A/B/C
+        node_name = parts[0].strip().upper().replace(" ", "")
         x = float(parts[1].strip())
         y = float(parts[2].strip())
         return (node_name, x, y)
@@ -446,14 +440,20 @@ class ScoreDisplay:
         - Khởi tạo tất cả Node với None/empty (chưa có dữ liệu)
         """
         
-        # ✓ Dict lưu dữ liệu: {Node_name: {x, y, score, ring_name, shots: []}}
-        # Khởi tạo 5 Node từ NODE1 đến NODE5
+        # ✓ Dict lưu dữ liệu: 15 node (5 node × 3 dãy A/B/C)
+        # Dãy A = đợt bắn 1, Dãy B = đợt bắn 2, Dãy C = đợt bắn 3
+        _empty = lambda: {"x": None, "y": None, "score": None,
+                          "ring_name": None, "shots": []}
         self.scores = {
-            "NODE1": {"x": None, "y": None, "score": None, "ring_name": None, "shots": []},
-            "NODE2": {"x": None, "y": None, "score": None, "ring_name": None, "shots": []},
-            "NODE3": {"x": None, "y": None, "score": None, "ring_name": None, "shots": []},
-            "NODE4": {"x": None, "y": None, "score": None, "ring_name": None, "shots": []},
-            "NODE5": {"x": None, "y": None, "score": None, "ring_name": None, "shots": []},
+            # ── Dãy A (hàng 1) ────────────────────────────────
+            "NODE1A": _empty(), "NODE2A": _empty(), "NODE3A": _empty(),
+            "NODE4A": _empty(), "NODE5A": _empty(),
+            # ── Dãy B (hàng 2) ────────────────────────────────
+            "NODE1B": _empty(), "NODE2B": _empty(), "NODE3B": _empty(),
+            "NODE4B": _empty(), "NODE5B": _empty(),
+            # ── Dãy C (hàng 3) ────────────────────────────────
+            "NODE1C": _empty(), "NODE2C": _empty(), "NODE3C": _empty(),
+            "NODE4C": _empty(), "NODE5C": _empty(),
         }
     
     def update(self, node_name, x, y):
@@ -644,84 +644,42 @@ class ScoreDisplay:
     
     def display(self):
         """
-        Hiển thị điểm số dạng bảng trên console
-        
-        🔧 HOẠT ĐỘNG:
-        1. In dòng kẻ trên
-        2. In tiêu đề (SHOOTING RANGE SCORING SYSTEM)
-        3. In header (tên các Node)
-        4. In tọa độ X của mỗi Node
-        5. In tọa độ Y của mỗi Node
-        6. In điểm số của mỗi Node
-        7. In tên vòng của mỗi Node
-        8. In dòng kẻ dưới
-        
-        📊 ĐỊNH DẠNG:
-        ================================================================================
-        SHOOTING RANGE SCORING SYSTEM
-        ================================================================================
-        |      NODE1      |      NODE2      |      NODE3      |      NODE4      | NODE5 |
-        X:   |      -26      |       15       |       45       |       10       |  -30  |
-        Y:   |       30      |       -20      |       50       |        5       |  25   |
-        Điểm:|       10      |        8       |        5       |        7       |   6   |
-        Vòng:|   Bullseye    |    Vòng 3      |    Vòng 6      |    Vòng 4      | Vòng 5|
-        ================================================================================
+        Hiển thị bảng điểm nhóm theo dãy A / B / C.
         """
-        
-        # ✓ In dòng kẻ trên (=== =)
-        print("\n" + "="*80)
-        
-        # ✓ In tiêu đề (căn giữa, chiều rộng 80)
-        print("SHOOTING RANGE SCORING SYSTEM".center(80))
-        
-        # ✓ In dòng kẻ dưới tiêu đề
-        print("="*80)
-        
-        # === In header (tên các Node) ===
-        # Tạo dòng header: |  NODE1  |  NODE2  | ...
-        header = "| " + " | ".join(
-            f"{node:^14}"      # Tên Node, căn giữa, rộng 14 ký tự
-            for node in self.scores.keys()
-        ) + " |"
-        print(header)
-        
-        # ✓ In dòng kẻ dưới header (---)
-        print("-" * len(header))
-        
-        # === In tọa độ X ===
-        # Tạo dòng X: |  -26  |  15  | ...
-        x_row = "| " + " | ".join(
-            f"{str(self.scores[node]['x']):^14}"   # Giá trị X, căn giữa
-            for node in self.scores.keys()
-        ) + " |"
-        print(f"X:   {x_row}")
-        
-        # === In tọa độ Y ===
-        # Tạo dòng Y: |  30  |  -20  | ...
-        y_row = "| " + " | ".join(
-            f"{str(self.scores[node]['y']):^14}"   # Giá trị Y, căn giữa
-            for node in self.scores.keys()
-        ) + " |"
-        print(f"Y:   {y_row}")
-        
-        # === In điểm số ===
-        # Tạo dòng Điểm: |  10  |  8  | ...
-        score_row = "| " + " | ".join(
-            f"{str(self.scores[node]['score']):^14}"   # Điểm số, căn giữa
-            for node in self.scores.keys()
-        ) + " |"
-        print(f"Điểm:{score_row}")
-        
-        # === In tên vòng ===
-        # Tạo dòng Vòng: |  Bullseye  |  Vòng 3  | ...
-        ring_row = "| " + " | ".join(
-            f"{str(self.scores[node]['ring_name']):^14}"   # Tên vòng, căn giữa
-            for node in self.scores.keys()
-        ) + " |"
-        print(f"Vòng:{ring_row}")
-        
-        # ✓ In dòng kẻ cuối
-        print("="*80 + "\n")
+        print("\n" + "=" * 70)
+        print("BẢNG ĐIỂM  –  " + datetime.now().strftime('%H:%M:%S'))
+        print("=" * 70)
+
+        for row_label, suffix in [("HÀNG 1", "A"),
+                                   ("HÀNG 2", "B"),
+                                   ("HÀNG 3", "C")]:
+            print(f"\n  {row_label} – Dãy {suffix}")
+            print("  " + "-" * 64)
+            print(f"  {'NODE':<10} {'Viên 1':>12} {'Viên 2':>12} "
+                  f"{'Viên 3':>12} {'TỔNG':>6}")
+            print("  " + "-" * 64)
+
+            row_total = 0
+            for i in range(1, 6):
+                key   = f"NODE{i}{suffix}"
+                shots = self.scores[key]["shots"]
+                total = self.get_total_score(key)
+                row_total += total
+
+                def fmt(idx):
+                    if idx < len(shots):
+                        s = shots[idx]
+                        return "Miss" if s['score'] == 0 \
+                               else f"{s['score']}đ/{s['ring']}"
+                    return "—"
+
+                print(f"  {key:<10} {fmt(0):>12} {fmt(1):>12} "
+                      f"{fmt(2):>12} {total:>5}đ")
+
+            print(f"  {'Tổng dãy ' + suffix:<10} {'':>12} {'':>12} "
+                  f"{'':>12} {row_total:>5}đ")
+
+        print("\n" + "=" * 70 + "\n")
 
 # ==================== VÒNG LẶP CHÍNH ====================
 
