@@ -30,8 +30,8 @@
  *   Byte 16–19  : Timestamp D
  *
  * HARDWARE:
- *   STM32F407VG @ 168MHz
- *   TIM2 @ 168MHz → 5.95 ns/tick
+ *   STM32F407VG @ 168MHz (HCLK)
+ *   TIM2 @ 84MHz (APB1×2), PSC=0 → 1 tick = 11.9 ns
  *   SPI2 Slave (DMA1 Stream4 CH0)
  * ============================================================================
  */
@@ -52,7 +52,7 @@
 /** Cấu trúc lưu timestamp của một sensor (giữ nguyên từ main.c cũ) */
 typedef struct {
     uint8_t  sensor_id;    /* 'A', 'B', 'C', 'D' */
-    uint32_t timestamp;    /* 32-bit TIM2 capture value (168MHz ticks) */
+    uint32_t timestamp;    /* 32-bit TIM2 capture value (84MHz, PSC=0 → 11.9ns/tick) */
 } SensorData_t;
 
 /** Mảng 4 sensor – index 0='A', 1='B', 2='C', 3='D' */
@@ -189,7 +189,8 @@ static void pack_spi_buffer(void)
  * SIMPLE DELAY
  * ============================================================================
  * Blocking delay đơn giản dùng cho reset cycle và retry.
- * Với 168MHz: ~1ms ≈ 168000 iterations (NOP ~1 cycle).
+ * CPU chạy @ 168MHz: ~1ms ≈ 168000 NOP iterations.
+ * (TIM2 chạy @ 84MHz nhưng CPU vẫn 168MHz → delay không đổi)
  */
 static void simple_delay(volatile uint32_t count)
 {
@@ -214,7 +215,7 @@ int main(void)
 
     /* ── 3. Khởi tạo ngoại vi ────────────────────────────────── */
     GPIO_Init();    /* PA0–PA3 AF01(TIM2), PB0 OUT, PB12–15 AF05(SPI2) */
-    Timer_Init();   /* TIM2 32-bit 168MHz, IC 4 kênh, CC interrupt */
+    Timer_Init();   /* TIM2 32-bit, 84MHz, PSC=0 → 11.9ns/tick, IC 4 kênh */
     SPI_Init();     /* SPI2 Slave, DMA1 Stream4 CH0, 8-bit Mode0 */
 
     /* Đảm bảo DATA_READY LOW khi boot */
