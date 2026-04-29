@@ -3,11 +3,26 @@
  * ----------------------------------------------------------------
  * TIM2 là timer 32-bit trên APB1.
  *
- * Clock:
- *   HCLK = 168MHz, APB1 prescaler = 4 → APB1 = 42MHz
- *   Vì APB1 prescaler > 1 → TIM2 clock = 42 × 2 = 84MHz
- *   PSC = 0 → tick = 1/84MHz ≈ 11.9 ns (độ phân giải cao nhất)
- *   Nếu muốn 1 tick = 1µs → PSC = 83
+ * Clock thực tế:
+ *   HCLK = 168MHz
+ *   APB1 prescaler = /4 → APB1 = 42MHz
+ *   Vì APB1 prescaler > 1 → TIM2 clock = 42MHz × 2 = 84MHz
+ *   (KHÔNG phải 168MHz — TIM2 nằm trên APB1, không phải AHB)
+ *
+ * Cấu hình PSC:
+ *   PSC = 83 → TIM2 đếm = 84MHz / (83+1) = 1MHz → 1 tick = 1µs
+ *   Độ phân giải vị trí: 1µs × 34300 cm/s = 0.0343 cm/tick
+ *   PSC = 0  → 1 tick = 11.9ns (tối đa, nhưng không cần thiết)
+ *
+ * Tại sao giữ PSC = 83 (1µs/tick)?
+ *   - Độ phân giải 0.034 mm hoàn toàn đủ (sai số thực ~0.5–2 cm)
+ *   - NODE.py dùng STM32_CLK_FREQ = 84e6 / (PSC+1) = 1MHz
+ *     → TICK_TO_SECONDS = 1µs = 1e-6 s (dễ tính)
+ *
+ * Tại sao không dùng TIM1 (168MHz, 16-bit)?
+ *   TIM1 16-bit overflow sau 2^16/168MHz = 0.39ms
+ *   Sensor xa nhất cần 141cm/34300 cm/s = 4.1ms → overflow 10 lần!
+ *   TIM2 32-bit overflow sau 2^32/1MHz = 4295 giây → an toàn tuyệt đối.
  *
  * Channel mapping (AF01):
  *   TIM2_CH1 → PA0 (Sensor A)
@@ -16,9 +31,6 @@
  *   TIM2_CH4 → PA3 (Sensor D)
  *
  * Capture: Rising edge, no filter, no prescaler
- *
- * FIX: Thay toàn bộ macro _Pos bằng bit shift trực tiếp,
- *      thay _Msk bằng literal mask, tương thích mọi phiên bản header.
  */
 
 #include "../inc/timmer.h"
@@ -51,10 +63,14 @@ void Timer_Init(void)
 
     /* ── 3. Prescaler ────────────────────────────────────────────── */
     /*
-     * PSC = 83 → TIM2 clock = 84MHz / 84 = 1MHz → 1 tick = 1µs
-     * Đủ độ phân giải cho TDOA (tốc độ âm ~0.0343 cm/µs)
+     * PSC = 0 → TIM2 đếm thẳng ở 84MHz → 1 tick = 11.9 ns
+     *
+     * Đây là độ phân giải tối đa của TIM2 trên STM32F407VG.
+     * Giá trị CCR lớn nhất khi sensor xa nhất (~141cm):
+     *   141cm / 34300cm/s = 4.1ms = 4,100,000 ns / 11.9 ns ≈ 344,538 ticks
+     * Hoàn toàn trong giới hạn 32-bit (max = 4,294,967,295). ✓
      */
-    TIM2->PSC = 83U;
+    TIM2->PSC = 0U;
 
     /* ── 4. Auto-reload: max 32-bit ─────────────────────────────── */
     TIM2->ARR = 0xFFFFFFFFU;
