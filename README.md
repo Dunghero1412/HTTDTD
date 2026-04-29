@@ -22,716 +22,583 @@
 ```
 
 ---
+<div align="center">
 
-## 🔧 Cách Hoạt Động Chung
 
-### Sơ Đồ Hệ Thống
-## 📊 Sơ Đồ Mạch
-```
-```
-[Xem sơ đồ mạch chi tiết](docs/wiring_diagram.html)
-## Sơ đồ mạch dành cho NODE:
-![Wiring Diagram](docs/wiring_diagram.svg)
-## Sơ đồ mạch dùng cho CONTROLLER:
-![Wiring Diagram](docs/wiring_diagram_controller.svg)
-```
-```
-### Quy Trình Hoạt Động
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
+[![Platform](https://img.shields.io/badge/Platform-RPi5%20%7C%20RPi%20Zero%202W%20%7C%20STM32F407-red.svg)]()
 
-#### **1. Giai Đoạn Khởi Động**
-```
-Controller (RPi 5) khởi động
-    ↓
-Khởi tạo GPIO cho 7 nút bấm
-    ↓
-Khởi tạo LoRa module
-    ↓
-Mở file log (score.txt)
-    ↓
-Chờ người dùng bấm nút
-```
+**Phát triển bởi [Chiêm Dũng](https://github.com/Dunghero1412)**
 
-#### **2. Giai Đoạn Điều Khiển (Khi Bấm Nút)**
-```
-Người dùng bấm nút (VD: Nút NODE1)
-    ↓
-GPIO 2 phát hiện (từ HIGH → LOW)
-    ↓
-Callback function gửi lệnh "NODE1 UP" qua LoRa
-    ↓
-Node 1 nhận lệnh
-    ↓
-Node 1 đưa GPIO 20 lên HIGH (bật motor/actuator)
-    ↓
-Bắt đầu chờ viên đạn bay qua bia
-```
-
-#### **3. Giai Đoạn Phát Hiện Viên Đạn**
-```
-Viên đạn bay qua bia có 4 cảm biến Piezo ở 4 góc
-    ↓
-Cảm biến phát hiện tác động (giá trị ADC > ngưỡng)
-    ↓
-Ghi nhận thời gian phát hiện của mỗi cảm biến
-    ↓
-Sử dụng TDOA (Time Difference of Arrival) để tính tọa độ (x, y)
-    ↓
-Gửi tọa độ về Controller: "NODE1, x=-26, y=30"
-```
-
-#### **4. Giai Đoạn Hiển Thị & Lưu Log**
-```
-Controller nhận dữ liệu từ Node
-    ↓
-Phân tích dữ liệu (tách node_name, x, y)
-    ↓
-Cập nhật bảng điểm hiển thị
-    ↓
-Ghi vào file log (score.txt)
-    ↓
-Hiển thị bảng điểm mới nhất trên console
-```
-
-#### **5. Giai Đoạn Dừng**
-```
-Người dùng bấm nút lần thứ 2 (hoặc hết 60s)
-    ↓
-Callback function gửi lệnh "NODE1 DOWN"
-    ↓
-Node 1 nhận lệnh
-    ↓
-Node 1 đưa GPIO 20 về LOW (tắt motor/actuator)
-    ↓
-Dừng phát hiện viên đạn
-```
-
-### Chi Tiết Kỹ Thuật
-
-#### **Giao Thức LoRa**
-- **Tần số**: 915 MHz (ISM band - công nghiệp, khoa học, y tế)
-- **Tốc độ baud**: 57600 bps
-- **Khoảng cách tối đa**: Vài km (tùy môi trường)
-- **Khoảng cách tối ưu**: 200m đến 700m
-- **Định dạng lệnh**: `NODE1 UP` hoặc `NODE1 DOWN`
-- **Định dạng dữ liệu**: `NODE 1, -26, 30`
-
-#### **Phương Pháp Tính Tọa Độ (TDOA - Time Difference of Arrival)**
-
-Viên đạn chuyển động với vận tốc âm thanh (~340 m/s). Dựa trên thời gian phát hiện khác nhau ở 4 cảm biến, chúng ta có thể tính được vị trí chính xác:
-
-```
-Khoảng cách từ cảm biến = Vận tốc âm thanh × Thời gian phát hiện
-
-VD: Nếu cảm biến A phát hiện tại t=0.001s
-    d_A = 340 m/s × 0.001s = 0.34m = 34cm
-
-Tọa độ được tính bằng phương pháp triangulation (tam giác)
-dựa trên khoảng cách từ 4 cảm biến
-```
-
-#### **Cấu Hình MCP3204 ADC**
-- **Kênh 0 (CH0)**: Sensor A (Góc trái dưới: -50, -50)
-- **Kênh 1 (CH1)**: Sensor B (Góc trái trên: -50, 50)
-- **Kênh 2 (CH2)**: Sensor C (Góc phải trên: 50, 50)
-- **Kênh 3 (CH3)**: Sensor D (Góc phải dưới: 50, -50)
-- **Độ phân giải**: 12-bit (0-4095)
-- **Tốc độ SPI**: 1 MHz
+</div>
 
 ---
 
-## 🛠️ Yêu Cầu Phần Cứng & Phần Mềm
+## 📋 Mục lục
 
-### Phần Cứng
-
-#### **Controller (RPi 5)**
-| Thành phần | Thông số | Ghi chú |
-|-----------|---------|--------|
-| Raspberry Pi 5 | 8GB RAM | Bộ điều khiển trung tâm |
-| LoRa Module SX1278 | 915 MHz | Giao tiếp không dây |
-| 7 Nút bấm NO | 5V logic | GPIO 2, 3, 4, 5, 6, 7, 8 |
-| Nguồn điện | 5V 3A | Cấp điện cho RPi 5 |
-| Dây USB-UART | CH340 hoặc PL2303 | Kết nối LoRa qua UART 1 |
-
-#### **Node (RPi Zero 2W) - x5 bộ**
-| Thành phần | Thông số | Ghi chú |
-|-----------|---------|--------|
-| Raspberry Pi Zero 2W | 512MB RAM | Bộ máy trạm |
-| LoRa Module SX1278 | 915 MHz | Nhận lệnh từ Controller |
-| MCP3204 ADC | 12-bit, 4 kênh | Đọc cảm biến Piezo |
-| Cảm biến Piezoelectric | 4 cảm biến | Phát hiện viên đạn |
-| Op-Amp | TL072 hoặc LM358 | Khuếch đại tín hiệu từ Piezo |
-| Transistor/Relay | 5V | Điều khiển motor/actuator |
-| Motor/Actuator | 5V-12V | Nâng/hạ bia |
-| Nguồn điện | 5V 2A | Cấp điện cho Zero 2W |
-
-### Phần Mềm
-
-#### **Controller (RPi 5)**
-```bash
-# OS
-- Raspberry Pi OS Bookworm (64-bit)
-
-# Python Version
-- Python 3.10 trở lên
-
-# Thư viện Python
-- RPi.GPIO (điều khiển GPIO)
-- rpi-lora (giao tiếp LoRa)
-```
-
-#### **Node (RPi Zero 2W)**
-```bash
-# OS
-- Raspberry Pi OS Lite Bookworm (32-bit)
-
-# Python Version
-- Python 3.10 trở lên
-
-# Thư viện Python
-- RPi.GPIO (điều khiển GPIO)
-- rpi-lora (giao tiếp LoRa)
-- spidev (giao tiếp SPI với MCP3204)
-```
+- [Giới thiệu](#-giới-thiệu)
+- [Nguyên lý hoạt động](#-nguyên-lý-hoạt-động)
+- [Thuật toán Hybrid](#-thuật-toán-hybrid-wa--hyperbolic-refinement)
+- [Phần cứng](#-phần-cứng)
+  - [Cấu hình Controller](#controller--raspberry-pi-5)
+  - [Cấu hình Node](#node--rpi-zero-2w--stm32f407vg)
+  - [Sơ đồ kết nối](#sơ-đồ-kết-nối)
+- [Phần mềm](#-phần-mềm)
+- [Cấu trúc thư mục](#-cấu-trúc-thư-mục)
+- [Cài đặt](#-cài-đặt)
+- [Khởi động hệ thống](#-khởi-động-hệ-thống)
+- [Vận hành](#-vận-hành)
+- [Định dạng log và kết quả](#-định-dạng-log-và-kết-quả)
+- [Xử lý sự cố](#-xử-lý-sự-cố)
+- [Tài liệu bổ sung](#-tài-liệu-bổ-sung)
+- [Giấy phép](#-giấy-phép)
+- [Liên hệ](#-liên-hệ)
 
 ---
 
-## 📦 Hướng Dẫn Cài Đặt Tự động
+## 🎯 Giới thiệu
 
-### 1. Clone Repository
+**HTTDTD** là hệ thống tính điểm tự động cho các bài bắn súng AK trong huấn luyện quân sự. Thay vì chấm điểm thủ công sau mỗi lượt bắn, hệ thống phát hiện và định vị điểm chạm của viên đạn theo thời gian thực bằng cách thu nhận **sóng N-Wave** — sóng áp suất siêu âm đặc trưng do viên đạn bay ở tốc độ cao (Mach ~2.1 ≈ 714 m/s) tạo ra.
 
-```bash
-# Clone từ GitHub
-git clone https://github.com/Dunghero1412/HTTDTD.git
-cd HTTDTD
-# Clone trên mỗi board kể cả Controller và tất cả các node.
-```
-
-## 2. Cài đặt Controller (RPi 5)
-
-#### 1.cài đặt file cơ bản.
-```bash
-sudo apt update
-sudo apt upgrade
-cd HTTDTD
-chmod 755 /opt
-python3 setup.py install controller
-```
-#### 2. cấu hình uart
-```bash
-# Mở raspi-config
-sudo raspi-config
-
-# Chọn: Interfacing Options → Serial Port
-# Enable Serial: Yes
-# Login shell: No
-# Hardware serial: Yes
-
-# Khởi động lại
-sudo reboot
-```
-#### **Bước 3: Cài đặt Python packages**
-```bash
-# Cài pip (nếu chưa có)
-sudo apt install python3-pip -y
-
-# Cài các thư viện cần thiết
-pip3 install RPi.GPIO rpi-lora
-```
-
-
-## 3. Cài đặt Node ( RPi Zero 2W)
-
-#### 1. cài đặt file cơ bản.
-```bash
-sudo apt update
-sudo apt upgrade 
-cd HTTDTD
-chmod 755
-python3 setup.py install node<mã của node . ví dụ : 2>
-```
-
-#### Bước 2: Bật SPI
-```bash
-# Mở raspi-config
-sudo raspi-config
-
-# Chọn: Interfacing Options → SPI
-# Enable SPI: Yes
-
-# Khởi động lại
-sudo reboot
-```
-
-#### Bước 3: Cài đặt Python packages
-```bash
-# Cài pip (nếu chưa có)
-sudo apt install python3-pip -y
-
-# Cài các thư viện cần thiết
-pip3 install RPi.GPIO rpi-lora spidev adafruit-circuitpython-mcp3x0x
-```
-
-
-
-## 📦 Hướng Dẫn Cài Đặt Thủ Công
-
-### 1. Clone Repository
-
-```bash
-# Clone từ GitHub
-git clone https://github.com/Dunghero1412/HTTDTD.git
-cd HTTDTD
-```
-
-### 2. Cài Đặt Controller (RPi 5)
-
-#### **Bước 1: Cập nhật hệ thống**
-```bash
-sudo apt update
-sudo apt upgrade -y
-```
-
-#### **Bước 2: Bật UART 1**
-```bash
-# Mở raspi-config
-sudo raspi-config
-
-# Chọn: Interfacing Options → Serial Port
-# Enable Serial: Yes
-# Login shell: No
-# Hardware serial: Yes
-
-# Khởi động lại
-sudo reboot
-```
-
-#### **Bước 3: Cài đặt Python packages**
-```bash
-# Cài pip (nếu chưa có)
-sudo apt install python3-pip -y
-
-# Cài các thư viện cần thiết
-pip3 install RPi.GPIO rpi-lora
-```
-
-#### **Bước 4: Copy file Controller**
-```bash
-# Copy file controller.py vào thư mục
-cp controller.py ~/HTTDTD/
-chmod +x ~/HTTDTD/controller.py
-```
-
-### 3. Cài Đặt Node (RPi Zero 2W)
-
-#### **Bước 1: Cập nhật hệ thống**
-```bash
-sudo apt update
-sudo apt upgrade -y
-```
-
-#### **Bước 2: Bật SPI**
-```bash
-# Mở raspi-config
-sudo raspi-config
-
-# Chọn: Interfacing Options → SPI
-# Enable SPI: Yes
-
-# Khởi động lại
-sudo reboot
-```
-
-#### **Bước 3: Cài đặt Python packages**
-```bash
-# Cài pip (nếu chưa có)
-sudo apt install python3-pip -y
-
-# Cài các thư viện cần thiết
-pip3 install RPi.GPIO rpi-lora spidev adafruit-circuitpython-mcp3x0x
-```
-
-#### **Bước 4: Copy file Node**
-```bash
-# Copy file node.py vào thư mục
-cp node.py ~/HTTDTD/
-chmod +x ~/HTTDTD/node.py
-```
-
-#### **Bước 5: Tùy chỉnh tên Node**
-```bash
-# Mở file node.py trên Node 1
-nano ~/HTTDTD/node.py
-
-# Tìm dòng: NODE_NAME = "NODE1"
-# Thay đổi thành NODE2, NODE3, ... cho các Node khác
-# Lưu file (Ctrl+X, Y, Enter)
-```
+**Điểm nổi bật:**
+- Phát hiện sóng N-Wave bằng cảm biến Piezoelectric — không cần đạn chạm bia trực tiếp
+- Timestamp phần cứng độ phân giải **5.95 ns** nhờ TIM2 32-bit của STM32F407VG
+- Thuật toán **Hybrid (Weighted Average + Hyperbolic Refinement)** — sai số < 2 cm
+- Tốc độ âm thanh được cập nhật động qua cảm biến **BME280** mỗi 60 giây
+- Hỗ trợ **15 node** (5 node × 3 dãy A/B/C), điều khiển từ xa qua **LoRa 915 MHz**
 
 ---
 
-## 🚀 Cách Sử Dụng
+## ⚙️ Nguyên lý hoạt động
 
-### 1. Khởi Động Controller
-
-```bash
-# Trên RPi 5
-cd ~/HTTDTD
-python3 controller.py
+```
+                    Viên đạn (Mach 2.1)
+                          │
+                          ▼
+              ┌───────────────────────┐
+              │    Sóng N-Wave        │  ← Cone sóng âm siêu âm
+              │  lan ra xung quanh   │     tốc độ 343 m/s ở 20°C
+              └───────────────────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+     Piezo A         Piezo B/C/D     Piezo ...
+     (góc bia)       (các góc còn lại)
+          │               │
+          ▼               ▼
+     ┌─────────────────────────────┐
+     │   STM32F407VG – TIM2       │
+     │   Input Capture 4 kênh     │  ← Ghi timestamp phần cứng
+     │   Độ phân giải: 5.95 ns    │     khi mỗi sensor kích hoạt
+     └─────────────────────────────┘
+                    │
+                    │ SPI (20 bytes)
+                    ▼
+     ┌─────────────────────────────┐
+     │   RPi Zero 2W               │
+     │   NODE.py                   │  ← TDOA + Hybrid triangulation
+     │   Tính toạ độ (x, y)        │
+     └─────────────────────────────┘
+                    │
+                    │ LoRa 915 MHz
+                    ▼
+     ┌─────────────────────────────┐
+     │   Raspberry Pi 5            │
+     │   CONTROLLER.py             │  ← Tính điểm + hiển thị
+     │   score_gui.html            │
+     └─────────────────────────────┘
 ```
 
-**Output kỳ vọng:**
-```
-[INIT] LoRa initialized at 915MHz
-============================================================
-[2024-04-17 10:25:30] CONTROLLER STARTED - RPi 5
-============================================================
-```
+### Chuỗi sự kiện chi tiết
 
-### 2. Khởi Động Các Node
-
-```bash
-# Trên mỗi RPi Zero 2W
-cd ~/HTTDTD
-python3 node.py
-```
-
-**Output kỳ vọng:**
-```
-============================================================
-NODE STARTED - NODE1
-============================================================
-[SENSOR] Waiting for impact...
-```
-
-### 3. Thực Hiện Bắn Súng
-
-#### **Quy Trình**
-1. **Bấm nút điều khiển** (ví dụ: NODE1) trên Controller
-   - Motor/actuator sẽ nâng bia lên
-   - Console hiển thị: `[TX] Sent: NODE1 UP`
-
-2. **Bắn viên đạn** vào bia tương ứng
-   - Viên đạn sẽ bay qua bia, tác động vào 4 cảm biến
-   - Node sẽ phát hiện và tính tọa độ
-
-3. **Node gửi dữ liệu** về Controller
-   - Console hiển thị: `[RX] Received: NODE 1, -26, 30`
-   - Bảng điểm được cập nhật
-
-4. **Bấm nút lần thứ 2** để dừng
-   - Motor/actuator sẽ hạ bia xuống
-   - Console hiển thị: `[TX] Sent: NODE1 DOWN`
-
-### 4. Xem Kết Quả
-
-#### **Trên Console (Bảng Điểm Realtime)**
-```
-============================================================
-SHOOTING RANGE SCORING SYSTEM
-============================================================
-|     NODE1      |     NODE2      |     NODE3      |     NODE4      |     NODE5      |
-X:  |     -26     |       15       |       45       |      None      |      None      |
-Y:  |      30     |      -20       |       50       |      None      |      None      |
-============================================================
-```
-
-#### **File Log (score.txt)**
-```
-[2024-04-17 10:25:30] CONTROLLER STARTED - RPi 5
-[2024-04-17 10:25:35] [TX] Sent: NODE1 UP
-[2024-04-17 10:25:40] [RX] Received: NODE 1, -26 , 30
-[2024-04-17 10:25:41] [RX] Received: NODE 1, -15 , 20
-[2024-04-17 10:25:42] [RX] Received: NODE 1, 5 , -10
-[2024-04-17 10:25:45] [TX] Sent: NODE1 DOWN
-```
+| Bước | Thực hiện bởi | Nội dung | Thời gian |
+|---|---|---|---|
+| 1 | Vật lý | Sóng N-Wave lan đến 4 cảm biến Piezo | ~0–10 ms |
+| 2 | STM32 TIM2 | Capture timestamp 4 kênh đồng thời | ~5 µs |
+| 3 | STM32 | Đóng gói SPI packet 20 bytes, kéo PB0 HIGH | ~1 µs |
+| 4 | RPi Zero 2W | Nhận SPI, chuẩn hóa Δt, tính toạ độ | ~2 ms |
+| 5 | RPi Zero 2W | Gửi kết quả qua LoRa | ~50–150 ms |
+| 6 | RPi 5 | Tính điểm, cập nhật bảng điểm | ~1 ms |
 
 ---
 
-## 📁 Cấu Trúc Thư Mục
+## 🧮 Thuật toán Hybrid (WA + Hyperbolic Refinement)
+
+Hệ thống dùng phương pháp **Hybrid 2 bước** để cân bằng giữa tốc độ và độ chính xác.
+
+### Bước 1 — Weighted Average (Ước tính nhanh)
+
+Dùng chênh lệch khoảng cách âm thanh `Δd = Δt × c` để tính trọng số cho từng sensor:
+
+```
+weight_X = 1 / (|Δd_X| + ε)
+```
+
+Sensor nào sensor sóng âm sớm nhất (Δd nhỏ) → gần đạn nhất → weight cao → kéo ước tính về phía đó.
+
+> Ưu điểm: Cực nhanh (~0.5 ms), không phân kỳ.  
+> Nhược điểm: Sai số 5–20 cm vì không dùng thông tin hướng TDOA.  
+> Vai trò: Cung cấp điểm khởi đầu tốt cho bước tiếp theo.
+
+### Bước 2 — Hyperbolic Refinement (Tinh chỉnh)
+
+Dùng `scipy.optimize.least_squares` để tối thiểu hóa **residuals**:
+
+```
+residual_X = (d_X − d_ref)_lý_thuyết − (d_X − d_ref)_đo_được
+
+Với:
+  d_X   = khoảng cách từ điểm ước tính đến sensor X
+  d_ref = khoảng cách từ điểm ước tính đến sensor tham chiếu (A)
+  Δd_đo = Δt_X × c(T)   ← c(T) tính từ BME280
+```
+
+Hàm này hội tụ từ điểm khởi đầu của WA trong 3–5 vòng lặp với sai số < 2 cm.
+
+> Công thức tốc độ âm theo nhiệt độ:
+> ```
+> c(T) = 331.3 × √(1 + T / 273.15)   [m/s]
+> ```
+
+**Ví dụ thực tế:** Xem [`docs/EXAMPLE.md`](docs/EXAMPLE.md) với bài toán minh hoạ đầy đủ tại toạ độ (29, 31) cm.
+
+---
+
+## 🔧 Phần cứng
+
+### Controller — Raspberry Pi 5
+
+| Linh kiện | Số lượng | Ghi chú |
+|---|---|---|
+| Raspberry Pi 5 | 1 | 4GB RAM trở lên |
+| LoRa SX1278 | 1 | 915 MHz, UART |
+| Nút bấm | 8 | Có điện trở pull-up 10kΩ |
+
+### Node — RPi Zero 2W + STM32F407VG
+
+| Linh kiện | Số lượng / Node | Ghi chú |
+|---|---|---|
+| Raspberry Pi Zero 2W | 1 | OS Lite 64-bit |
+| STM32F407VG | 1 | 168 MHz, TIM2 32-bit |
+| LoRa SX1278 | 1 | 915 MHz, UART |
+| BME280 | 1 | I2C, đo nhiệt độ |
+| Piezoelectric Sensor | 4 | 1 ở mỗi góc bia |
+| Pre-amp + Buffer | 4 | OPA2134 hoặc MCP6004 |
+| ADC Comparator | 4 | Mạch điều kiện tín hiệu |
+
+---
+
+### Sơ đồ kết nối
+
+#### Controller (RPi 5)
+
+```
+RPi 5 GPIO                    Nút bấm (×8)
+─────────────────────────────────────────────
+GP2  (GPIO INPUT, pull-up) ── Nút NODE1
+GP3  (GPIO INPUT, pull-up) ── Nút NODE2
+GP4  (GPIO INPUT, pull-up) ── Nút NODE3
+GP5  (GPIO INPUT, pull-up) ── Nút NODE4
+GP6  (GPIO INPUT, pull-up) ── Nút NODE5
+GP7  (GPIO INPUT, pull-up) ── Nút ALL (tất cả)
+GP8  (GPIO INPUT, pull-up) ── Nút EXTRA
+GP17 (GPIO INPUT, pull-up) ── Nút dự phòng
+                   GND ─────── Một chân mỗi nút (khi bấm → GND)
+
+RPi 5 UART1                   LoRa SX1278
+─────────────────────────────────────────────
+GPIO14 (UART1 TX) ──────────── RXD
+GPIO15 (UART1 RX) ──────────── TXD
+3.3V ───────────────────────── VCC
+GND ────────────────────────── GND
+GND ────────────────────────── M0, M1    (Transparent mode)
+```
+
+#### Node (RPi Zero 2W ↔ STM32F407VG)
+
+```
+RPi Zero 2W SPI0              STM32F407VG SPI2
+─────────────────────────────────────────────
+GPIO10 (MOSI) ──────────────── PB15 (SPI2_MOSI)
+GPIO9  (MISO) ──────────────── PB14 (SPI2_MISO)
+GPIO11 (SCLK) ──────────────── PB13 (SPI2_SCK)
+GPIO8  (CE0)  ──────────────── PB12 (SPI2_NSS)
+GPIO17 (INPUT)──────────────── PB0  (DATA_READY)
+
+RPi Zero 2W I2C               BME280
+─────────────────────────────────────────────
+GPIO2  (SDA)  ──────────────── SDA
+GPIO3  (SCL)  ──────────────── SCL
+3.3V ───────────────────────── VCC, SDO→GND  (địa chỉ 0x76)
+GND ────────────────────────── GND
+
+RPi Zero 2W UART1             LoRa SX1278
+─────────────────────────────────────────────
+GPIO14 (TX)   ──────────────── RXD
+GPIO15 (RX)   ──────────────── TXD
+3.3V ───────────────────────── VCC
+GND ────────────────────────── GND, M0, M1
+
+STM32F407VG TIM2              Piezoelectric Sensors
+─────────────────────────────────────────────
+PA0 (TIM2_CH1, AF01) ───────── Sensor A (Góc Trên-Trái)
+PA1 (TIM2_CH2, AF01) ───────── Sensor B (Góc Trên-Phải)
+PA2 (TIM2_CH3, AF01) ───────── Sensor C (Góc Dưới-Trái)
+PA3 (TIM2_CH4, AF01) ───────── Sensor D (Góc Dưới-Phải)
+```
+
+> Sơ đồ chi tiết dạng SVG: xem [`docs/wiring_diagram.svg`](docs/wiring_diagram.svg) và [`docs/wiring_diagram_controller.svg`](docs/wiring_diagram_controller.svg)
+
+---
+
+## 💻 Phần mềm
+
+### Controller — Raspberry Pi OS 64-bit (Desktop)
+
+| Thư viện | Phiên bản | Mục đích |
+|---|---|---|
+| `RPi.GPIO` | ≥ 0.7.1 | Điều khiển GPIO nút bấm |
+| `pyserial` | ≥ 3.5 | Giao tiếp UART với LoRa |
+| `pylorahat` | latest | Thư viện LoRa SX1278 |
+
+### Node — Raspberry Pi OS Lite 64-bit
+
+| Thư viện | Phiên bản | Mục đích |
+|---|---|---|
+| `spidev` | ≥ 3.6 | Đọc SPI từ STM32 |
+| `RPi.GPIO` | ≥ 0.7.1 | GPIO DATA_READY, CONTROL |
+| `pyserial` | ≥ 3.5 | UART LoRa |
+| `pylorahat` | latest | Thư viện LoRa SX1278 |
+| `scipy` | ≥ 1.11 | Hyperbolic Refinement (least_squares) |
+| `adafruit-circuitpython-bme280` | ≥ 2.6 | Cảm biến nhiệt độ |
+| `adafruit-blinka` | ≥ 8.0 | CircuitPython trên RPi |
+
+> ⚠️ **Không cần chạy pip thủ công.** `setup.py` tự động cài tất cả thư viện trên.
+
+---
+
+## 📁 Cấu trúc thư mục
 
 ```
 HTTDTD/
 │
-├── README.md                 
-│  # Tài liệu này
-├── setup.py                  
-│        # File cài đặt tự động.
-├── script/                   
-│    │  # Thư mục chứa các script.
-│    ├── /CONTROLLER/CONTROLLER.py       
-│    │  # Code cho RPi 5 (Controller)
-│    ├── NODE-A/NODE.py             
-│    │  # Code cho RPi Zero 2w
-│    │  # Node nhóm A dành cho bia số 4 (bia nằm)
-│    ├── NODE-B/NODE.py             
-│    │  # Code cho RPi Zero 2w
-│    │  # Node nhóm B dành cho bia số 7 (bia quỳ)
-│    ├── NODE-C/NODE.py             
-│    │  # Code cho RPi Zero 2w
-│    │  # Node nhóm C dành cho bia số 8 (bia đứng)
-│    ├── NODE-D/NODE.py             
-│    │  # Code cho RPi Zero 2w
-│    │  # Node nhóm D cho bài 2 AK(cả bia chạy 8c)
-│    └── SX1728.md           
-│        # File hướng dẫn setup LoRa module SX1278.
+├── scripts/                        # Mã nguồn thực thi chính
+│   ├── CONTROLLER/
+│   │   └── CONTROLLER.py           # Chương trình Controller (RPi 5)
+│   │
+│   ├── NODE_A/                     # Node dãy A (đợt bắn 1)
+│   │   └── NODE.py
+│   ├── NODE_B/                     # Node dãy B (đợt bắn 2)
+│   │   ├── NODE.py
+│   │   └── MASK.py                 # Mask vùng không tính điểm
+│   ├── NODE_C/                     # Node dãy C (đợt bắn 3)
+│   │   ├── NODE.py
+│   │   └── MASK.py
+│   ├── NODE_D/                     # Node dãy D (mở rộng)
+│   │   ├── NODE.py
+│   │   └── MASK.py
+│   │
+│   └── STM32/                      # Firmware STM32F407VG
+│       ├── src/
+│       │   ├── main.c              # Vòng lặp chính, TIM2 IRQ Handler
+│       │   ├── system.c            # Cấu hình clock 168 MHz, NVIC
+│       │   ├── gpio.c              # PA0–PA3 (TIM2), PB0 (DATA_READY), SPI2
+│       │   ├── timmer.c            # TIM2 Input Capture 4 kênh
+│       │   └── spi.c               # SPI2 Slave + DMA TX
+│       ├── inc/                    # Header files + CMSIS STM32F4
+│       ├── lib/
+│       │   ├── startup/
+│       │   │   └── startup_stm32f407xx.s   # Vector table, Reset_Handler
+│       │   └── ld/
+│       │       └── stm32f407vg.ld  # Linker script
+│       └── Makefile
 │
-├── docs/                     
-│    │  # Tài liệu chi tiết
-│    ├── score.txt           
-│    │  # File log kết quả (tự động tạo)
-│    ├── ~~hardware-setup.md~~     
-│    │  ~~# Hướng dẫn lắp ráp phần cứng~~
-│    ├── wiring-diagram.md     
-│    │  # Sơ đồ đấu nối
-│    ├── wiring_diagram_controller.svg
-│    │  # sơ đồ đấu nối với GUI cho controller
-│    ├── wiring_diagram.svg
-│    │  # sơ đồ đấu nối với GUI cho node
-│    └── ~~calibration.md  ~~      
-│        ~~# Hướng dẫn calibrate~~
 ├── html/
-│    │  # gui html cho code.
-│    ├── score_gui.html
-│    │  # bảng gui hiển thị điểm va chạm realtime.
-│    └── score_visualizer.html
-│       # bảng giả lập với kết quả nhập tay.
+│   └── score_gui.html              # Giao diện hiển thị điểm trên trình duyệt
 │
-└── examples/                 # Ví dụ sử dụng
-    └── sample-log.txt        # Ví dụ file log
+├── docs/
+│   ├── wiring_diagram.svg          # Sơ đồ nối dây Node
+│   ├── wiring_diagram_controller.svg  # Sơ đồ nối dây Controller
+│   ├── wiring_diagram_node_stm32.svg  # Sơ đồ Node (STM32 version)
+│   ├── schematic_piezo_4ch.svg     # Sơ đồ mạch tín hiệu Piezo 4 kênh
+│   ├── EXAMPLE.md                  # Bài toán mô phỏng minh hoạ thuật toán
+│   └── INSTALL_HARDWARE.md         # Hướng dẫn lắp đặt phần cứng chi tiết
+│
+├── setup.py                        # Script cài đặt tự động (cả lib lẫn service)
+└── README.md
 ```
 
 ---
 
-## 🔧 Hướng Dẫn Calibrate & Troubleshoot
+## 🚀 Cài đặt
 
-### 1. Calibrate Ngưỡng Phát Hiện (Threshold)
+### Yêu cầu chung
 
-**Vấn đề**: Hệ thống không phát hiện viên đạn hoặc phát hiện sai
+- RPi 5 và RPi Zero 2W đã cài Raspberry Pi OS tương ứng
+- STM32F407VG đã nạp firmware (xem [`scripts/STM32/`](scripts/STM32/))
+- Kết nối phần cứng đúng theo sơ đồ ở phần trên
+- Kết nối Internet lần đầu để tải thư viện
 
-**Cách giải quyết**:
+### Các bước cài đặt
 
-#### **Bước 1: Tìm giá trị ADC thực tế**
-
-Sửa file `node.py` để in giá trị ADC:
-
-```python
-# Tìm hàm read_all_sensors() và thêm dòng này:
-print(f"  Sensor {sensor_name} (CH{channel}): {value}")
+**1. Clone repository**
+```bash
+git clone https://github.com/Dunghero1412/HTTDTD.git
+cd HTTDTD
 ```
 
-#### **Bước 2: Bắn thử**
+**2. Chạy setup.py**
+
+Trên máy **Controller (RPi 5)**:
+```bash
+sudo python3 setup.py install controller
+```
+
+Trên máy **Node** (ví dụ: Node 1 dãy A, Node 3 dãy B, Node 5 dãy C):
+```bash
+sudo python3 setup.py install node1a
+sudo python3 setup.py install node3b
+sudo python3 setup.py install node5c
+```
+
+> `setup.py` sẽ tự động:
+> - Cài toàn bộ thư viện pip cần thiết
+> - Bật I2C, SPI, UART trên RPi
+> - Tạo systemd service để tự khởi động khi boot
+
+**3. Nạp firmware STM32** (nếu chưa làm)
+```bash
+cd scripts/STM32
+make
+# Flash qua ST-Link:
+openocd -f interface/stlink.cfg -f target/stm32f4x.cfg \
+        -c "program stm32_firmware.bin 0x08000000 verify reset exit"
+```
+
+---
+
+## 🔌 Khởi động hệ thống
+
+> **Thứ tự bắt buộc: Controller trước → Các Node sau**
+
+### Bước 1 — Khởi động Controller
 
 ```bash
-# Chạy Node
-python3 node.py
-
-# Bắn vài viên vào bia
-# Xem console in ra giá trị ADC của các sensor
+# Trên RPi 5:
+cd HTTDTD/scripts/CONTROLLER
+python3 CONTROLLER.py
 ```
 
-**Output ví dụ**:
-```
-Sensor A (CH0): 1500
-Sensor B (CH1): 3200
-Sensor C (CH2): 2800
-Sensor D (CH3): 1700
+Hoặc nếu đã cài service:
+```bash
+sudo systemctl start httdtd-controller
+sudo systemctl status httdtd-controller
 ```
 
-#### **Bước 3: Điều chỉnh Threshold**
-
-Nếu thấy các sensor phát hiện được giá trị 2000-3500, điều chỉnh:
-
-```python
-# Trong node.py, tìm dòng:
-IMPACT_THRESHOLD = 2000
-
-# Thay đổi thành giá trị phù hợp (thường 1800-2200)
-IMPACT_THRESHOLD = 2000
+Chờ xuất hiện log:
+```
+[INIT] GPIO ready (8 buttons)
+[INIT] LoRa ready at 915.0MHz
+========================================
+CONTROLLER STARTED - RPi 5
+========================================
 ```
 
-### 2. Kiểm Tra Kết Nối LoRa
-
-#### **Vấn đề**: Controller không thể nhận/gửi dữ liệu
-
-**Kiểm tra**:
+### Bước 2 — Khởi động từng Node
 
 ```bash
-# 1. Kiểm tra port UART
-ls -la /dev/ttyAMA*
-
-# Kết quả kỳ vọng: /dev/ttyAMA1 (hoặc /dev/ttyAMA0)
-
-# 2. Kiểm tra baud rate
-dmesg | grep ttyAMA
-
-# 3. Kiểm tra quyền truy cập
-sudo usermod -a -G dialout $USER
+# Trên mỗi RPi Zero 2W:
+cd HTTDTD/scripts/NODE_A   # hoặc NODE_B, NODE_C...
+python3 NODE.py
 ```
 
-### 3. Kiểm Tra Kết Nối SPI (Node)
+Chờ xuất hiện log:
+```
+[INIT] GPIO ready
+[INIT] SPI ready at 10.0MHz (mode 0)
+[INIT] LoRa ready at 915.0MHz
+[INIT] BME280 ready – T=26.3°C → sound_speed=345.78 m/s
+[INIT] Sound speed update thread started (interval=60s)
+============================
+NODE STARTED - NODE1A
+============================
+```
 
-#### **Vấn đề**: Node không thể đọc MCP3204
+---
 
-**Kiểm tra**:
+## 🎮 Vận hành
+
+### Điều khiển bằng nút bấm (Controller)
+
+| Nút | GPIO | Chức năng | Nhấn lần 1 | Nhấn lần 2 |
+|---|---|---|---|---|
+| Nút 1 | GP2 | Node 1 | UP (bật bia) | DOWN (hạ bia) |
+| Nút 2 | GP3 | Node 2 | UP | DOWN |
+| Nút 3 | GP4 | Node 3 | UP | DOWN |
+| Nút 4 | GP5 | Node 4 | UP | DOWN |
+| Nút 5 | GP6 | Node 5 | UP | DOWN |
+| Nút ALL | GP7 | Tất cả | UP tất cả | DOWN tất cả |
+| Nút EXTRA | GP8 | Chế độ bảo trì | Khoá các nút khác | Mở khoá |
+
+### Luồng vận hành một lượt bắn
+
+```
+1. Nhấn nút tương ứng → bia nâng lên (GPIO20 = HIGH)
+2. Xạ thủ bắn (tối đa 3 viên / lượt)
+3. Sau mỗi viên: Node tự động tính toạ độ và gửi về Controller
+4. Controller hiển thị điểm từng viên lên bảng điểm
+5. Sau 3 viên hoặc timeout 60s → bia tự hạ xuống
+6. Điểm được ghi vào score_data.json và log
+```
+
+### Giao diện web (tùy chọn)
+
+Mở `html/score_gui.html` trên trình duyệt để xem điểm chạm trực quan trên mặt bia ảo.
+
+---
+
+## 📄 Định dạng log và kết quả
+
+### Mẫu file log (`httdtd.log`)
+
+```
+2024-11-15 14:32:05 | [INIT] Controller started
+2024-11-15 14:32:18 | [CMD]  Sent: NODE1A:UP
+2024-11-15 14:32:24 | [RAW]  NODE1A, 29.0, 31.0
+2024-11-15 14:32:24 | [SCORE] NODE1A | Viên 1 | x=29.00 y=31.00 | r=42.45cm | Vòng 5 | 5 điểm
+2024-11-15 14:32:31 | [SCORE] NODE1A | Viên 2 | x=-12.30 y=8.50 | r=15.07cm | Vòng 9 | 9 điểm
+2024-11-15 14:32:38 | [SCORE] NODE1A | Viên 3 | x=3.10 y=-2.80 | r=4.17cm  | Vòng 10 | 10 điểm
+2024-11-15 14:32:38 | [TOTAL] NODE1A | Tổng: 24/30 điểm
+2024-11-15 14:32:39 | [CMD]  Sent: NODE1A:DOWN
+```
+
+### Mẫu file kết quả (`score_data.json`)
+
+```json
+{
+  "session": "2024-11-15_14:32:05",
+  "rounds": {
+    "NODE1A": {
+      "shots": [
+        {"viên": 1, "x": 29.0,  "y": 31.0,  "r": 42.45, "ring": "Vòng 5",  "score": 5},
+        {"viên": 2, "x": -12.3, "y": 8.5,   "r": 15.07, "ring": "Vòng 9",  "score": 9},
+        {"viên": 3, "x": 3.1,   "y": -2.8,  "r": 4.17,  "ring": "Vòng 10", "score": 10}
+      ],
+      "total": 24
+    },
+    "NODE2A": {
+      "shots": [
+        {"viên": 1, "x": null, "y": null, "r": null, "ring": "Miss", "score": 0},
+        {"viên": 2, "x": null, "y": null, "r": null, "ring": "Miss", "score": 0},
+        {"viên": 3, "x": null, "y": null, "r": null, "ring": "Miss", "score": 0}
+      ],
+      "total": 0
+    }
+  },
+  "grand_total": {
+    "day_A": 85,
+    "day_B": 72,
+    "day_C": 91
+  }
+}
+```
+
+---
+
+## 🛠️ Xử lý sự cố
+
+### Node không kết nối được LoRa
+
+| Triệu chứng | Nguyên nhân | Giải pháp |
+|---|---|---|
+| `[ERROR] LoRa init failed` | UART chưa bật | `sudo raspi-config → Interface → Serial → Enable` |
+| Không nhận được lệnh | Sai tần số | Kiểm tra cả Controller và Node đều dùng **915 MHz** |
+| Mất packet ngẫu nhiên | Khoảng cách quá xa | Giảm khoảng cách hoặc tăng gain anten |
+| Module LoRa không phản hồi | M0/M1 sai | Đảm bảo M0 và M1 đều nối **GND** |
+
+### STM32 không gửi dữ liệu
+
+| Triệu chứng | Nguyên nhân | Giải pháp |
+|---|---|---|
+| `[TIMEOUT] No DATA_READY` | STM32 chưa capture | Kiểm tra nguồn 3.3V cho STM32 |
+| SPI trả về toàn `0x00` | NSS không kéo xuống | Kiểm tra dây GPIO8 (CE0) → PB12 |
+| Timestamp không hợp lý | TIM2 PSC sai | Rebuild firmware, kiểm tra `timer.c` PSC=83 |
+| Chỉ 1–3 sensor hoạt động | Cảm biến hỏng/lỏng | Kiểm tra kết nối PA0–PA3, đo tín hiệu OPA output |
+
+### Điểm số sai vị trí
+
+| Triệu chứng | Nguyên nhân | Giải pháp |
+|---|---|---|
+| Sai số > 5 cm | Nhiệt độ môi trường lệch | Kiểm tra BME280 (`i2cdetect -y 1`) |
+| Kết quả luôn lệch một hướng | Cảm biến lắp sai góc | Kiểm tra thứ tự A/B/C/D theo đúng sơ đồ |
+| Điểm nhảy loạn | Nhiễu điện | Thêm tụ bypass 100nF gần OPA, dùng cáp có màn chắn |
+| `MISS` liên tục | Ngưỡng ADC comparator quá cao | Chỉnh VRef của mạch comparator |
+
+### BME280 không đọc được
 
 ```bash
-# 1. Bật SPI
-sudo raspi-config
-
-# 2. Kiểm tra SPI device
-ls -la /dev/spidev*
-
-# Kết quả kỳ vọng: /dev/spidev0.0
-
-# 3. Kiểm tra I2C (nếu dùng I2C)
+# Kiểm tra địa chỉ I2C:
 i2cdetect -y 1
+# Nên thấy 0x76 hoặc 0x77
 
-# Kỳ vọng: Thấy MCP3204 ở địa chỉ 0x68 hoặc địa chỉ tương tự
-```
-
-### 4. Kiểm Tra GPIO
-
-#### **Vấn đề**: Nút bấm không hoạt động
-
-**Kiểm tra**:
-
-```bash
-# 1. Xem trạng thái GPIO
-gpioinfo
-
-# 2. Test GPIO bằng tay
-python3 << 'EOF'
-import RPi.GPIO as GPIO
-import time
-
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(2, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-while True:
-    state = GPIO.input(2)
-    print(f"GPIO 2: {state}")
-    time.sleep(0.5)
-EOF
-
-# Bấm nút, xem trạng thái thay đổi từ 1 -> 0
-```
-
-### 5. Kiểm Tra Ghi File Log
-
-#### **Vấn đề**: File score.txt không được tạo
-
-**Kiểm tra**:
-
-```bash
-# 1. Xem quyền thư mục
-ls -la ~/HTTDTD/
-
-# Thêm quyền nếu cần
-chmod 777 ~/HTTDTD/
-
-# 2. Tạo file log thủ công
-touch ~/HTTDTD/score.txt
-chmod 666 ~/HTTDTD/score.txt
-
-# 3. Chạy Controller lại
-python3 controller.py
-```
-
-### 6. Debug Dữ Liệu
-
-#### **Xem dữ liệu realtime**
-
-```bash
-# Terminal 1: Chạy Controller
-python3 controller.py
-
-# Terminal 2: Giám sát file log
-tail -f score.txt
-
-# Bấm nút và xem dữ liệu được ghi vào log
+# Nếu không thấy: kiểm tra dây SDA/SCL và nguồn 3.3V
+# Đảm bảo I2C đã bật:
+sudo raspi-config → Interface Options → I2C → Enable
+sudo reboot
 ```
 
 ---
 
-## 📊 Ví Dụ Sử Dụng Thực Tế
+## 📚 Tài liệu bổ sung
 
-### Kịch Bản: Thi Bắn Súng 5 Vận Động Viên
+| File | Nội dung |
+|---|---|
+| [`docs/EXAMPLE.md`](docs/EXAMPLE.md) | Bài toán mô phỏng đầy đủ với viên đạn tại (29, 31) cm |
+| [`docs/INSTALL_HARDWARE.md`](docs/INSTALL_HARDWARE.md) | Hướng dẫn lắp đặt phần cứng chi tiết |
+| [`docs/wiring_diagram.svg`](docs/wiring_diagram.svg) | Sơ đồ nối dây Node (SVG) |
+| [`docs/wiring_diagram_controller.svg`](docs/wiring_diagram_controller.svg) | Sơ đồ nối dây Controller (SVG) |
+| [`docs/schematic_piezo_4ch.svg`](docs/schematic_piezo_4ch.svg) | Sơ đồ mạch tín hiệu Piezo 4 kênh |
+
+---
+
+## 📜 Giấy phép
 
 ```
-VĐV 1 (Node1)    VĐV 2 (Node2)    VĐV 3 (Node3)    VĐV 4 (Node4)    VĐV 5 (Node5)
-    ↓                ↓                ↓                ↓                ↓
-  Bia 1            Bia 2            Bia 3            Bia 4            Bia 5
-(4 Piezo)        (4 Piezo)        (4 Piezo)        (4 Piezo)        (4 Piezo)
+MIT License
 
-          Controller (RPi 5)
-         (Điều khiển + Hiển thị)
-```
+Copyright (c) 2024 Chiêm Dũng (Dunghero1412)
 
-**Quy Trình**:
-1. VĐV 1 sẵn sàng → Bấm nút Node1 → Bia nâng lên
-2. VĐV 1 bắn 3 viên → Node1 gửi 3 tọa độ về Controller
-3. VĐV 1 xong → Bấm nút Node1 → Bia hạ xuống
-4. Lặp lại cho VĐV 2, 3, 4, 5
-5. Tất cả kết quả được hiển thị trên màn hình + lưu trong score.txt
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-**Bảng kết quả cuối cùng**:
-```
-============================================================
-SHOOTING RANGE SCORING SYSTEM
-============================================================
-|     NODE1      |     NODE2      |     NODE3      |     NODE4      |     NODE5      |
-X:  |     -15     |       10       |      -30       |       25       |      -25       |
-Y:  |      25     |      -15       |       30       |      -10       |       20       |
-X:  |      -5     |       20       |      -20       |       35       |      -15       |
-Y:  |      30     |       -5       |       25       |       -5       |       25       |
-X:  |       5     |       15       |      -10       |       30       |      -20       |
-Y:  |      20     |      -10       |       20       |       -15      |       15       |
-============================================================
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 ```
 
 ---
 
-## 🐛 Các Lỗi Thường Gặp & Giải Pháp
+## 📬 Liên hệ
 
-| Lỗi | Nguyên Nhân | Giải Pháp |
-|-----|-----------|---------|
-| `ModuleNotFoundError: No module named 'rpi_lora'` | Chưa cài đặt thư viện | `pip3 install rpi-lora` |
-| `PermissionError: /dev/ttyAMA1` | Không có quyền truy cập UART | `sudo usermod -a -G dialout $USER` |
-| `No module named 'spidev'` (Node) | Chưa cài spidev | `pip3 install spidev` |
-| Nút bấm không phản ứng | GPIO chưa được khởi tạo đúng | Kiểm tra chân GPIO có đúng không |
-| Không nhận dữ liệu từ Node | LoRa không giao tiếp được | Kiểm tra UART, tần số LoRa |
-| `FileNotFoundError: score.txt` | File log không tồn tại | Tạo file: `touch score.txt` |
-| Tọa độ X, Y = None | Không phát hiện đủ 2 cảm biến | Calibrate lại threshold |
+Nếu gặp sự cố hoặc có đóng góp, vui lòng liên hệ:
 
----
-
-## 📞 Hỗ Trợ & Liên Hệ
-
-Nếu gặp vấn đề hoặc có câu hỏi, vui lòng:
-
-- Tạo **Issue** trên GitHub
-- Kiểm tra phần **Troubleshoot** ở trên
-- Xem **File Log** (score.txt) để tìm lỗi
-- Hoặc liên hệ qua email: **dhr151103@gmail.com**
-
+| Kênh | Địa chỉ |
+|---|---|
+| 📧 Email | [dhr1412.vn@gmail.com](mailto:dhr1412.vn@gmail.com) |
+| 🐦 X (Twitter) | [@dungchiem171708](https://x.com/dungchiem171708) |
+| 💻 GitHub | [Dunghero1412](https://github.com/Dunghero1412) |
+| 🐛 Bug Report | [Issues](https://github.com/Dunghero1412/HTTDTD/issues) |
 
 ---
 
-## 📝 License
-
-Dự án này được cấp phép dưới **MIT License**. Bạn được tự do sử dụng, sửa đổi và phân phối.
-
----
-
-## 👨‍💻 Tác Giả
-
-Dự án HTTDTD được phát triển bởi **Dunghero1412**
-
----
-
-## 🙏 Lời Cảm Ơn
-
-Cảm ơn đã sử dụng hệ thống HTTDTD!
-
-**Chúc bạn thành công với dự án!** 🎯🚀
-
+<div align="center">
+  <sub>Made with ❤️ by Chiêm Dũng · HTTDTD v2.0</sub>
+</div>
