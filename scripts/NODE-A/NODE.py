@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-RPi Nano 2W Node - Sử dụng STM32F407 Thay MCP3204
+RPi Zero 2W Node - Sử dụng STM32F407 Thay MCP3204
 
 🎯 MỤC ĐÍCH CHÍNH:
 1. Chờ tín hiệu DATA_READY từ STM32 (GPIO17)
@@ -40,7 +40,7 @@ Piezo Sensor (A,B,C,D)
     RPi gửi tọa độ qua LoRa
 
 ⏱️ TIMING:
-- STM32 capture: nanosecond (5.95ns/tick)
+- STM32 capture: nanosecond (11.904ns/tick)
 - SPI transfer: 20 bytes @ 10.5MHz ≈ 15μs
 - RPi process: ~10ms
 - Total latency: ~10-20ms (vs. 100-120ms with MCP3204!)
@@ -234,28 +234,23 @@ BME280_UPDATE_INTERVAL = 60
 
 # === CẤU HÌNH STM32 TIMESTAMP ===
 
-# ✓ Tần số TIM2 sau prescaler: 1 MHz
+# ✓ Tần số TIM2 với PSC = 0: 84 MHz → 1 tick = 11.9 ns
 #
 # GIẢI THÍCH:
-#   - TIM2 nguồn clock thực tế = 84 MHz (APB1 × 2)
-#   - timmer.c đặt PSC = 83 → TIM2 đếm = 84MHz / (83+1) = 1 MHz
-#   - Vậy STM32_CLK_FREQ ở đây = tần số SAU PSC = 1 MHz
-#
-# → 1 tick TIM2 = 1 / 1 MHz = 1 µs
+#   - TIM2 nguồn clock = 84 MHz (APB1 × 2)
+#   - timmer.c đặt PSC = 0 → không chia → TIM2 đếm ở 84 MHz
+#   - 1 tick = 1 / 84MHz = 11.904 ns
 #
 # ĐỘ PHÂN GIẢI VỊ TRÍ:
-#   1 µs × 34300 cm/s = 0.0343 cm/tick ≈ 0.34 mm
-#   Hoàn toàn đủ (sai số thực tế bị giới hạn bởi nhiễu ~0.5–2 cm)
+#   11.9 ns × 34300 cm/s = 0.000408 cm ≈ 0.004 mm
 #
-# TẠI SAO KHÔNG DÙNG TIM1 (168 MHz, 16-bit)?
-#   TIM1 16-bit overflow sau: 2^16 / 168MHz = 0.39 ms
-#   Bia 100×100 cm, sensor xa nhất ~141 cm → sóng âm mất 4.1 ms
-#   → TIM1 overflow 10 lần → timestamp sai hoàn toàn
-#   TIM2 32-bit @ 1MHz overflow sau: 2^32 / 1MHz = 4295 giây → AN TOÀN ✓
-STM32_CLK_FREQ = 1e6    # 1 MHz — TIM2 sau PSC=83 trong timmer.c
+# AN TOÀN OVERFLOW:
+#   Sensor xa nhất ~141cm → sóng âm mất 4.1ms = 344,538 ticks
+#   TIM2 32-bit max = 4,294,967,295 ticks → an toàn tuyệt đối ✓
+STM32_CLK_FREQ = 84e6   # 84 MHz — TIM2 @ PSC=0
 
 # ✓ Chuyển đổi từ tick STM32 → giây
-# TICK_TO_SECONDS = 1 / 1e6 = 1 µs per tick
+# TICK_TO_SECONDS = 1 / 84e6 ≈ 11.904 ns per tick
 TICK_TO_SECONDS = 1.0 / STM32_CLK_FREQ
 
 # ✓ Chuyển đổi từ tick → cm
@@ -295,7 +290,7 @@ HYPERBOLIC_TOLERANCE = 1e-6
 # ✓ File để lưu log tất cả sự kiện
 # Mỗi lần có tọa độ mới → ghi vào file này
 # Dùng để review lịch sử sau đó
-LOG_FILE = "score.txt"
+LOG_FILE = "/opt/score.txt"
 
 # ==================== KHỞI TẠO HARDWARE ====================
 # Khai báo trước, khởi tạo trong setup() để tránh crash khi import
