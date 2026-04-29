@@ -161,7 +161,8 @@ void TIM2_IRQHandler(void)
     }
 
     /* Xóa toàn bộ cờ SR đã snapshot */
-    TIM2->SR = ~sr;
+    /**TIM2->SR = ~sr; */
+    TIM2->SR = sr;
 }
 
 /* ============================================================================
