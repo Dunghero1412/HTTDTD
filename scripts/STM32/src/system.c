@@ -119,37 +119,30 @@ void SystemClock_Config(void) {
 
 /**
  * NVIC_Config - Configure Nested Vectored Interrupt Controller
- * 
- * 🔧 HOẠT ĐỘNG:
- * Enable interrupts cho:
- * - TIM2 (IRQn 28)
- * - SPI1 (IRQn 35)
- * - USART1 (IRQn 37)
+ *
+ * Enable interrupts cho đúng các ngoại vi đang dùng:
+ *   - TIM2           (IRQn 28)  ← Input Capture 4 kênh
+ *   - SPI2           (IRQn 36)  ← SPI Slave error handling
+ *   - DMA1_Stream4   (IRQn 15)  ← SPI2 TX DMA transfer complete
+ *
+ * FIX: Phiên bản cũ enable nhầm SPI1 (IRQn 35) và USART1 (IRQn 37).
+ *      Hệ thống dùng SPI2 và không dùng USART → sửa lại cho đúng.
+ *      Enable nhầm interrupt có thể trigger Default_Handler nếu
+ *      peripheral đó có cờ pending từ trạng thái reset.
  */
 void NVIC_Config(void) {
-    // ✓ Enable TIM2 interrupt (IRQn 28)
-    // ISER0 = bit 28 (vì IRQn < 32)
-    NVIC->ISER[0] |= (1 << 28);
-    
-    // ✓ Enable SPI1 interrupt (IRQn 35)
-    // ISER1 = bit (35 - 32) = bit 3
-    NVIC->ISER[1] |= (1 << 3);
-    
-    // ✓ Enable USART1 interrupt (IRQn 37)
-    // ISER1 = bit (37 - 32) = bit 5
-    NVIC->ISER[1] |= (1 << 5);
-    
-    // ✓ Set interrupt priorities (optional)
-    // IP register stores priority for each interrupt
-    // Lower number = higher priority
-    // Each interrupt has 4 bits (0-15)
-    
-    // TIM2 priority = 0 (highest, capture must be fast)
-    NVIC->IP[28] = 0 << 4;
-    
-    // SPI1 priority = 1
-    NVIC->IP[35] = 1 << 4;
-    
-    // USART1 priority = 2
-    NVIC->IP[37] = 2 << 4;
+    /* ── TIM2 (IRQn 28) – priority 0 (cao nhất) ─────────────────
+     * Capture timestamp phải nhanh nhất, không được trễ            */
+    NVIC->ISER[0] |= (1U << 28);   /* ISER0 bit 28 */
+    NVIC->IP[28]   = (0U << 4);    /* Priority 0 */
+
+    /* ── SPI2 (IRQn 36) – priority 1 ────────────────────────────
+     * Xử lý lỗi OVR / MODF của SPI2 Slave                         */
+    NVIC->ISER[1] |= (1U << (36 - 32));  /* ISER1 bit 4 */
+    NVIC->IP[36]   = (1U << 4);          /* Priority 1 */
+
+    /* ── DMA1 Stream4 (IRQn 15) – priority 1 ────────────────────
+     * Transfer complete / error của SPI2 TX DMA                    */
+    NVIC->ISER[0] |= (1U << 15);   /* ISER0 bit 15 */
+    NVIC->IP[15]   = (1U << 4);    /* Priority 1 */
 }
