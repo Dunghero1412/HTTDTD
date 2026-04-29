@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-RPi Zero 2W Node - Sử dụng STM32F407 Thay MCP3204
+RPi Nano 2W Node - Sử dụng STM32F407 Thay MCP3204
 
 🎯 MỤC ĐÍCH CHÍNH:
 1. Chờ tín hiệu DATA_READY từ STM32 (GPIO17)
@@ -10,7 +10,7 @@ RPi Zero 2W Node - Sử dụng STM32F407 Thay MCP3204
 4. Tính toán tọa độ viên đạn bằng Hybrid method
 5. Gửi tọa độ về Controller qua LoRa
 
-📍 PIN ASSIGNMENT (RPi Zero 2W - BCM mode):
+📍 PIN ASSIGNMENT (RPi Nano 2W - BCM mode):
 ┌─────────────────────────────────────────────┐
 │ GPIO17 (BCM) → DATA_READY input (STM32 PB0) │
 │ GPIO20 (BCM) → CONTROL output (motor relay) │
@@ -234,13 +234,28 @@ BME280_UPDATE_INTERVAL = 60
 
 # === CẤU HÌNH STM32 TIMESTAMP ===
 
-# ✓ Tần số clock của TIM2 trên STM32F407: 168MHz
-# STM32 chạy @ 168MHz, TIM2 counter cũng 168MHz (no prescaler)
-STM32_CLK_FREQ = 168e6
+# ✓ Tần số TIM2 sau prescaler: 1 MHz
+#
+# GIẢI THÍCH:
+#   - TIM2 nguồn clock thực tế = 84 MHz (APB1 × 2)
+#   - timmer.c đặt PSC = 83 → TIM2 đếm = 84MHz / (83+1) = 1 MHz
+#   - Vậy STM32_CLK_FREQ ở đây = tần số SAU PSC = 1 MHz
+#
+# → 1 tick TIM2 = 1 / 1 MHz = 1 µs
+#
+# ĐỘ PHÂN GIẢI VỊ TRÍ:
+#   1 µs × 34300 cm/s = 0.0343 cm/tick ≈ 0.34 mm
+#   Hoàn toàn đủ (sai số thực tế bị giới hạn bởi nhiễu ~0.5–2 cm)
+#
+# TẠI SAO KHÔNG DÙNG TIM1 (168 MHz, 16-bit)?
+#   TIM1 16-bit overflow sau: 2^16 / 168MHz = 0.39 ms
+#   Bia 100×100 cm, sensor xa nhất ~141 cm → sóng âm mất 4.1 ms
+#   → TIM1 overflow 10 lần → timestamp sai hoàn toàn
+#   TIM2 32-bit @ 1MHz overflow sau: 2^32 / 1MHz = 4295 giây → AN TOÀN ✓
+STM32_CLK_FREQ = 1e6    # 1 MHz — TIM2 sau PSC=83 trong timmer.c
 
 # ✓ Chuyển đổi từ tick STM32 → giây
-# TICK_TO_SECONDS = 1 / 168e6 = 5.95 nanosecond per tick
-# Ví dụ: 168 ticks = 168 × 5.95ns = 1000ns = 1μs
+# TICK_TO_SECONDS = 1 / 1e6 = 1 µs per tick
 TICK_TO_SECONDS = 1.0 / STM32_CLK_FREQ
 
 # ✓ Chuyển đổi từ tick → cm
