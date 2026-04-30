@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTTDTD – Score Visualizer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=Rajdhani:wght@400;600;700&display=swap');
+
+:root {
+  --bg:      #080a10;
+  --panel:   #0e1118;
+  --border:  #1c2235;
+  --accent:  #e8c840;
+  --red:     #e03838;
+  --green:   #38e080;
+  --dim:     #3a4560;
+  --text:    #c8d0e0;
+  --online:  #38e080;
+  --offline: #e03838;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  min-height: 100vh;
+  padding: 12px 16px 24px;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.header-title h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.8rem;
+  letter-spacing: 5px;
+  color: var(--accent);
+  line-height: 1;
+}
+.header-title p {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--dim);
+  letter-spacing: 2px;
+  margin-top: 2px;
+}
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+}
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--offline);
+  box-shadow: 0 0 6px var(--offline);
+  transition: background .3s, box-shadow .3s;
+}
+.status-dot.online {
+  background: var(--online);
+  box-shadow: 0 0 8px var(--online);
+}
+#statusText { color: var(--dim); }
+#lastUpdate { color: var(--dim); font-size: 0.65rem; }
+
+/* ── Main layout ── */
+.layout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+/* ── Target area ── */
+.target-wrap {
+  position: relative;
+  display: inline-block;
+}
+#targetCanvas {
+  display: block;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #000;
+}
+.target-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--dim);
+  text-align: center;
+  margin-top: 5px;
+  letter-spacing: 1px;
+}
+
+/* ── Right panel ── */
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* ── Node filter tabs ── */
+.tab-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tab {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--dim);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  padding: 5px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all .15s;
+  letter-spacing: 1px;
+}
+.tab:hover { border-color: var(--accent); color: var(--accent); }
+.tab.active {
+  background: #1e1808;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Score table (grouped by row A/B/C) ── */
+.row-block {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.row-header {
+  background: #111620;
+  padding: 6px 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--accent);
+  letter-spacing: 2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.row-total-badge {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+}
+table.score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+}
+.score-table th {
+  background: #0c1020;
+  color: var(--dim);
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-weight: normal;
+  letter-spacing: 1px;
+}
+.score-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #12182a;
+  vertical-align: middle;
+}
+.score-table tr:last-child td { border-bottom: none; }
+.score-table tr:hover td { background: #12192e; }
+
+.node-name { color: var(--text); font-weight: 700; }
+.shot-cell { color: var(--dim); }
+.score-hi  { color: var(--accent); font-weight: 700; }
+.score-lo  { color: var(--dim); }
+.miss-cell { color: var(--red); }
+.total-cell { color: #fff; font-weight: 700; font-size: 0.85rem; }
+
+/* ── Controls row ── */
+.controls-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.btn {
+  background: #12182a;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.btn:hover  { background: #1a2038; border-color: var(--accent); color: var(--accent); }
+.btn.danger { border-color: #582020; color: var(--red); }
+.btn.danger:hover { background: #200a0a; border-color: var(--red); }
+
+.json-path {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--dim);
+  background: #0a0e18;
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: 200px;
+}
+
+/* ── Grand total bar ── */
+.grand-total {
+  display: flex;
+  gap: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: 'Share Tech Mono', monospace;
+  flex-wrap: wrap;
+}
+.gt-item { display: flex; flex-direction: column; gap: 2px; }
+.gt-label { font-size: 0.65rem; color: var(--dim); letter-spacing: 1px; }
+.gt-value { font-size: 1.2rem; color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════════════════ -->
+<div class="header">
+  <div class="header-title">
+    <h1>HTTDTD</h1>
+    <p>SHOOTING SCORE VISUALIZER · 100×100 CM · 10 RINGS</p>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">OFFLINE</span>
+    <span id="lastUpdate">–</span>
+  </div>
+</div>
+
+<!-- ══ GRAND TOTAL ════════════════════════════════════════════════ -->
+<div class="grand-total" id="grandTotal">
+  <div class="gt-item"><div class="gt-label">DÃY A</div><div class="gt-value" id="gtA">0đ</div></div>
+  <div class="gt-item"><div class="gt-label">DÃY B</div><div class="gt-value" id="gtB">0đ</div></div>
+  <div class="gt-item"><div class="gt-label">DÃY C</div><div class="gt-value" id="gtC">0đ</div></div>
+  <div class="gt-item"><div class="gt-label">TỔNG</div><div class="gt-value" id="gtAll">0đ</div></div>
+  <div class="gt-item"><div class="gt-label">VIÊN</div><div class="gt-value" id="gtShots">0</div></div>
+  <div class="gt-item"><div class="gt-label">THỜI GIAN</div><div class="gt-value" id="gtTime">–</div></div>
+</div>
+
+<!-- ══ MAIN LAYOUT ════════════════════════════════════════════════ -->
+<div class="layout" style="margin-top:12px">
+
+  <!-- Target canvas -->
+  <div class="target-wrap">
+    <canvas id="targetCanvas" width="420" height="420"></canvas>
+    <div class="target-label">TÂM BIA (0,0) · MỖI VÒNG R=7.5 CM</div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="right-panel">
+
+    <!-- Controls -->
+    <div class="controls-row">
+      <span style="font-family:monospace;font-size:.7rem;color:var(--dim)">JSON:</span>
+      <input class="json-path" id="jsonPath" value="/opt/score.json" title="Đường dẫn file JSON">
+      <button class="btn" onclick="fetchNow()">↻ Tải ngay</button>
+      <button class="btn" onclick="toggleAuto()" id="btnAuto">⏸ Dừng tự động</button>
+      <button class="btn danger" onclick="clearAll()">✕ Xóa</button>
+    </div>
+
+    <!-- Tab filter: All / A / B / C -->
+    <div class="tab-row">
+      <button class="tab active" onclick="setTab('all',this)">TẤT CẢ</button>
+      <button class="tab" onclick="setTab('A',this)">DÃY A</button>
+      <button class="tab" onclick="setTab('B',this)">DÃY B</button>
+      <button class="tab" onclick="setTab('C',this)">DÃY C</button>
+    </div>
+
+    <!-- Score tables (filled by JS) -->
+    <div id="scoreTables"></div>
+
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════════════════════
+const RING_R     = 7.5;
+const NUM_RINGS  = 10;
+const TARGET_CM  = 100;           // bia 100×100 cm
+const FETCH_MS   = 2000;          // poll mỗi 2 giây
+const CANVAS_PX  = 420;           // canvas size
+
+// Màu theo dãy
+const ROW_COLORS = { A: '#e8c840', B: '#40c8e8', C: '#e84060' };
+
+// Màu theo node index (1–5)
+const NODE_COLORS = ['#e8c840','#40c8e8','#e84060','#60e840','#c040e8'];
+
+// State
+let allHits   = {};   // { 'NODE1A': [{x,y,score,ring,distance},...], ... }
+let activeTab = 'all';
+let autoTimer = null;
+let isAuto    = true;
+
+// ══════════════════════════════════════════════════════════════════
+// INIT – tạo hits dict cho 15 node
+// ══════════════════════════════════════════════════════════════════
+function initHits() {
+  allHits = {};
+  ['A','B','C'].forEach(row => {
+    for (let i = 1; i <= 5; i++) {
+      allHits[`NODE${i}${row}`] = [];
+    }
+  });
+}
+initHits();
+
+// ══════════════════════════════════════════════════════════════════
+// FETCH JSON từ /opt/score.json (hoặc path tuỳ chỉnh)
+// ══════════════════════════════════════════════════════════════════
+async function fetchNow() {
+  const path = document.getElementById('jsonPath').value.trim();
+  try {
+    const res  = await fetch(path + '?_=' + Date.now());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    loadFromJson(data);
+    setOnline(true, data.timestamp);
+  } catch (e) {
+    setOnline(false, null);
+    console.warn('[HTTDTD] fetch error:', e.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PARSE JSON → hits dict
+// Format: { timestamp, rounds: [{node, x, y, score, ring, distance}] }
+// ══════════════════════════════════════════════════════════════════
+function loadFromJson(data) {
+  initHits();
+  if (!data.rounds) return;
+
+  data.rounds.forEach(r => {
+    const key = r.node ? r.node.trim().toUpperCase() : null;
+    if (!key || !(key in allHits)) return;
+
+    // Toạ độ trong JSON đã là hệ tâm bia (0,0)
+    allHits[key].push({
+      x:        r.x        ?? null,
+      y:        r.y        ?? null,
+      score:    r.score    ?? 0,
+      ring:     r.ring     ?? '–',
+      distance: r.distance ?? null,
+    });
+  });
+
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// STATUS INDICATOR
+// ══════════════════════════════════════════════════════════════════
+function setOnline(online, ts) {
+  const dot  = document.getElementById('statusDot');
+  const txt  = document.getElementById('statusText');
+  const upd  = document.getElementById('lastUpdate');
+  dot.className  = 'status-dot' + (online ? ' online' : '');
+  txt.textContent = online ? 'ONLINE' : 'OFFLINE';
+  txt.style.color = online ? 'var(--online)' : 'var(--offline)';
+  if (ts) {
+    const d = new Date(ts);
+    upd.textContent = d.toLocaleTimeString('vi-VN');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// AUTO POLL
+// ══════════════════════════════════════════════════════════════════
+function toggleAuto() {
+  isAuto = !isAuto;
+  const btn = document.getElementById('btnAuto');
+  if (isAuto) {
+    startAuto();
+    btn.textContent = '⏸ Dừng tự động';
+  } else {
+    clearInterval(autoTimer);
+    btn.textContent = '▶ Tự động';
+  }
+}
+function startAuto() {
+  clearInterval(autoTimer);
+  autoTimer = setInterval(fetchNow, FETCH_MS);
+  fetchNow();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TAB FILTER
+// ══════════════════════════════════════════════════════════════════
+function setTab(tab, el) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RENDER – vẽ canvas + bảng điểm + grand total
+// ══════════════════════════════════════════════════════════════════
+function render() {
+  drawTarget();
+  buildTables();
+  updateGrandTotal();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CANVAS – vẽ bia + điểm chạm
+// Hệ toạ độ: tâm bia = (0,0), trái âm, phải dương, trên dương, dưới âm
+// ══════════════════════════════════════════════════════════════════
+const canvas = document.getElementById('targetCanvas');
+const ctx    = canvas.getContext('2d');
+const SCALE  = CANVAS_PX / TARGET_CM;   // 4.2 px/cm
+const CX     = CANVAS_PX / 2;           // pixel tâm x
+const CY     = CANVAS_PX / 2;           // pixel tâm y
+
+function cmToCanvas(x, y) {
+  // x: trái âm → phải dương, y: dưới âm → trên dương
+  return { px: CX + x * SCALE, py: CY - y * SCALE };
+}
+
+function drawTarget() {
+  ctx.clearRect(0, 0, CANVAS_PX, CANVAS_PX);
+
+  // Background
+  ctx.fillStyle = '#060809';
+  ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
+
+  // Vẽ 10 vòng từ ngoài vào trong
+  const ringFills = [
+    '#1a1a1a','#1a1a1a',   // vòng 1,2 – ngoài cùng
+    '#2a2a2a','#2a2a2a',   // vòng 3,4
+    '#444','#444',          // vòng 5,6
+    '#111','#111',          // vòng 7,8 – đen
+    '#e8e8e8','#e8e8e8',   // vòng 9,10 – trắng
+  ];
+
+  for (let i = 0; i < NUM_RINGS; i++) {
+    const ring  = NUM_RINGS - i;          // 10..1 từ trong ra
+    const rPx   = ring * RING_R * SCALE;
+    ctx.beginPath();
+    ctx.arc(CX, CY, rPx, 0, Math.PI * 2);
+    ctx.fillStyle = ringFills[i];
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth   = 0.6;
+    ctx.stroke();
+  }
+
+  // Số vòng (chỉ vẽ vòng 5, 6, 7, 8, 9, 10 để không rối)
+  ctx.font      = `bold ${Math.round(SCALE * 5.5)}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let ring = 5; ring <= NUM_RINGS; ring++) {
+    const rOuter = ring * RING_R * SCALE;
+    const rInner = (ring - 1) * RING_R * SCALE;
+    const rMid   = (rOuter + rInner) / 2;
+    // Vẽ ở góc 45° để không che điểm chạm
+    const angle  = Math.PI * 0.25;
+    const tx     = CX + rMid * Math.cos(angle);
+    const ty     = CY - rMid * Math.sin(angle);
+    ctx.fillStyle = ring >= 9 ? '#333' : 'rgba(255,255,255,0.3)';
+    ctx.fillText(ring, tx, ty);
+  }
+
+  // Crosshair
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth   = 0.5;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(CX, 0); ctx.lineTo(CX, CANVAS_PX); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, CY); ctx.lineTo(CANVAS_PX, CY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Vẽ điểm chạm
+  const rowsToShow = activeTab === 'all' ? ['A','B','C'] : [activeTab];
+  rowsToShow.forEach(row => {
+    for (let ni = 1; ni <= 5; ni++) {
+      const key    = `NODE${ni}${row}`;
+      const color  = NODE_COLORS[ni - 1];
+      const shots  = allHits[key] || [];
+      shots.forEach((h, idx) => {
+        if (h.x === null || h.y === null) return;  // MISS
+        const { px, py } = cmToCanvas(h.x, h.y);
+
+        // Glow
+        const grad = ctx.createRadialGradient(px, py, 0, px, py, 10);
+        grad.addColorStop(0, color + 'aa');
+        grad.addColorStop(1, color + '00');
+        ctx.beginPath();
+        ctx.arc(px, py, 10, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Impact dot
+        ctx.beginPath();
+        ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // Score label
+        ctx.font      = `bold ${Math.round(SCALE * 4)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = color;
+        ctx.fillText(h.score > 0 ? h.score : 'M', px, py - 6);
+
+        // Node tag (nhỏ hơn)
+        ctx.font      = `${Math.round(SCALE * 2.8)}px monospace`;
+        ctx.fillStyle = color + 'bb';
+        ctx.fillText(`${ni}${row}`, px, py - 6 - Math.round(SCALE * 4.5));
+      });
+    }
+  });
+
+  // Legend màu node
+  ctx.textAlign    = 'left';
+  ctx.textBaseline = 'top';
+  ctx.font = `bold ${Math.round(SCALE * 3.2)}px monospace`;
+  ['A','B','C'].forEach((row, ri) => {
+    if (activeTab !== 'all' && activeTab !== row) return;
+    const col = ROW_COLORS[row];
+    ctx.fillStyle = col;
+    ctx.fillText(`● DÃY ${row}`, 6, 6 + ri * 14);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SCORE TABLES – bảng theo dãy A/B/C
+// ══════════════════════════════════════════════════════════════════
+function buildTables() {
+  const container = document.getElementById('scoreTables');
+  container.innerHTML = '';
+
+  const rowsToShow = activeTab === 'all' ? ['A','B','C'] : [activeTab];
+
+  rowsToShow.forEach(row => {
+    let rowTotal = 0;
+    const rowHtml = [];
+
+    for (let ni = 1; ni <= 5; ni++) {
+      const key   = `NODE${ni}${row}`;
+      const shots = allHits[key] || [];
+      const total = shots.reduce((s, h) => s + (h.score || 0), 0);
+      rowTotal += total;
+
+      const shotCells = [0,1,2].map(idx => {
+        if (idx >= shots.length) return `<td class="shot-cell">—</td>`;
+        const h = shots[idx];
+        if (h.x === null) return `<td class="miss-cell">MISS</td>`;
+        const sc = h.score;
+        const cls = sc >= 8 ? 'score-hi' : sc >= 5 ? 'shot-cell' : 'score-lo';
+        return `<td class="${cls}">
+          ${sc}đ <span style="color:var(--dim);font-size:.65rem">${h.ring}</span><br>
+          <span style="color:var(--dim);font-size:.62rem">
+            (${h.x != null ? h.x.toFixed(1) : '–'}, ${h.y != null ? h.y.toFixed(1) : '–'})
+          </span>
+        </td>`;
+      }).join('');
+
+      rowHtml.push(`
+        <tr>
+          <td class="node-name" style="color:${NODE_COLORS[ni-1]}">
+            NODE${ni}${row}
+          </td>
+          ${shotCells}
+          <td class="total-cell">${total}đ</td>
+        </tr>
+      `);
+    }
+
+    container.insertAdjacentHTML('beforeend', `
+      <div class="row-block" style="margin-bottom:10px">
+        <div class="row-header">
+          <span>HÀNG ${row === 'A' ? '1' : row === 'B' ? '2' : '3'} – DÃY ${row}</span>
+          <span class="row-total-badge">${rowTotal}đ</span>
+        </div>
+        <table class="score-table">
+          <thead>
+            <tr>
+              <th>NODE</th>
+              <th>VIÊN 1</th>
+              <th>VIÊN 2</th>
+              <th>VIÊN 3</th>
+              <th>TỔNG</th>
+            </tr>
+          </thead>
+          <tbody>${rowHtml.join('')}</tbody>
+        </table>
+      </div>
+    `);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GRAND TOTAL
+// ══════════════════════════════════════════════════════════════════
+function updateGrandTotal() {
+  let totals = { A: 0, B: 0, C: 0 };
+  let totalShots = 0;
+
+  ['A','B','C'].forEach(row => {
+    for (let ni = 1; ni <= 5; ni++) {
+      const shots = allHits[`NODE${ni}${row}`] || [];
+      totals[row] += shots.reduce((s,h) => s + (h.score||0), 0);
+      totalShots  += shots.length;
+    }
+  });
+
+  document.getElementById('gtA').textContent    = totals.A + 'đ';
+  document.getElementById('gtB').textContent    = totals.B + 'đ';
+  document.getElementById('gtC').textContent    = totals.C + 'đ';
+  document.getElementById('gtAll').textContent  = (totals.A+totals.B+totals.C) + 'đ';
+  document.getElementById('gtShots').textContent = totalShots;
+  document.getElementById('gtTime').textContent  = new Date().toLocaleTimeString('vi-VN');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CLEAR
+// ══════════════════════════════════════════════════════════════════
+function clearAll() {
+  initHits();
+  setOnline(false, null);
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════════
+render();
+startAuto();
+</script>
+</body>
+</html>
