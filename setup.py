@@ -22,7 +22,7 @@ HTTDTD/
 │   │   ├── stm32_firmware.hex (hex file)
 │   │   └── Makefile (build script)
 │   └── html/
-│       └── score_gui.html
+│       └── score.html
 └── setup.py (file này)
 
 🔧 CÁCH SỬ DỤNG:
@@ -75,7 +75,8 @@ from datetime import datetime
 
 # ✓ Đường dẫn cài đặt
 INSTALL_PATH = Path("/opt")
-HTML_PATH = INSTALL_PATH / "html"
+INSTALL_HTML_PATH = Path("/var/www")
+HTML_PATH = INSTALL_HTML_PATH / "html"
 LOG_FILE = INSTALL_PATH / "setup.log"
 
 # ✓ Tên user chạy services
@@ -87,7 +88,7 @@ VALID_NODE_GROUPS = ["A", "B", "C", "D"]
 # ✓ Tên file trong các thư mục
 CONTROLLER_SCRIPT = "CONTROLLER.py"
 NODE_SCRIPT = "NODE.py"
-HTML_FILE = "score_gui.html"
+HTML_FILE = "score.html"
 
 # ✓ CẤU HÌNH STM32 FLASH
 STM32_FIRMWARE_DIR = Path(__file__).parent / "scripts" / "STM32"
@@ -908,7 +909,7 @@ Cấu trúc thư mục:
   │   │   ├── Makefile
   │   │   ├── src/
   │   │   └── ...
-  │   └── html/score_gui.html
+  │   └── html/score.html
   └── setup.py
 
 Ví dụ sử dụng:

@@ -279,7 +279,7 @@ table.score-table {
     <!-- Controls -->
     <div class="controls-row">
       <span style="font-family:monospace;font-size:.7rem;color:var(--dim)">JSON:</span>
-      <input class="json-path" id="jsonPath" value="/opt/score.json" title="Đường dẫn file JSON">
+      <input class="json-path" id="jsonPath" value="/score.json" title="Đường dẫn file JSON">
       <button class="btn" onclick="fetchNow()">↻ Tải ngay</button>
       <button class="btn" onclick="toggleAuto()" id="btnAuto">⏸ Dừng tự động</button>
       <button class="btn danger" onclick="clearAll()">✕ Xóa</button>
@@ -335,7 +335,7 @@ function initHits() {
 initHits();
 
 // ══════════════════════════════════════════════════════════════════
-// FETCH JSON từ /opt/score.json (hoặc path tuỳ chỉnh)
+// FETCH JSON từ /score.json (hoặc path tuỳ chỉnh)
 // ══════════════════════════════════════════════════════════════════
 async function fetchNow() {
   const path = document.getElementById('jsonPath').value.trim();
