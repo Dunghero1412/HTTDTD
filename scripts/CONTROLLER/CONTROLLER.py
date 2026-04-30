@@ -397,6 +397,20 @@ def calculate_score(x, y):
         'y': y,
     }
 
+#===================== XOÁ DỮ LIỆU JSON CHO ROUND MỚI ================
+
+def clear_score_json(file_path="/opt/score.json"):
+    """
+    Xóa nội dung file JSON, ghi lại cấu trúc rỗng hợp lệ.
+    """
+    try:
+        # Ghi cấu trúc rỗng: {"rounds": []}
+        with open(file_path, 'w') as f:
+            json.dump({"rounds": []}, f, indent=2)
+        log_data(f"[JSON] Cleared content of {file_path}")
+    except Exception as e:
+        log_data(f"[ERROR] Failed to clear JSON: {e}")
+
 # ==================== LỚP HIỂN THỊ DỮ LIỆU ====================
 
 class ScoreDisplay:
@@ -729,6 +743,7 @@ def button_callback(channel):
             send_command("EXTRA", "DOWN")
             button_states[channel] = False
             log_data("[CONTROL] EXTRA mode OFF")
+            clear_score_json()       # xoá dữ liệu round cho đợt tiếp theo (chỉ khả dụng sau khi đã báo bia).
 
     elif node_name == "B":
         if not button_states[channel]:
