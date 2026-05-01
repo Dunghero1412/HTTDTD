@@ -1,0 +1,93 @@
+#include "spi_comm.h"
+
+/* ────────────────────────────────────────────────────
+ *  SPI2 Pin Mapping (STM32F407):
+ *    PB13 → SCK   (AF5)
+ *    PB14 → MISO  (AF5)
+ *    PB15 → MOSI  (AF5)
+ *    PB12 → NSS   (software CS, GPIO output)
+ *
+ *  Mode: Master, 8-bit, CPOL=0 CPHA=0 (Mode 0)
+ *  Baudrate: APB1(42MHz) / 2 = 21 MHz
+ * ──────────────────────────────────────────────────── */
+
+#define SPI2_NSS_PIN    12U
+#define SPI2_SCK_PIN    13U
+#define SPI2_MISO_PIN   14U
+#define SPI2_MOSI_PIN   15U
+#define SPI2_AF         5U    // AF5 = SPI2
+
+static void SPI2_NSS_Low(void)  { GPIOB->BSRR = (1U << (SPI2_NSS_PIN + 16)); }
+static void SPI2_NSS_High(void) { GPIOB->BSRR = (1U << SPI2_NSS_PIN); }
+
+/* ── Busy-wait delay đơn giản (ticks) ──────────────── */
+static void SPI2_Delay(volatile uint32_t d) { while (d--); }
+
+void SPI2_Init(void) {
+    /* ── Enable clocks ──────────────────────────────── */
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+    RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
+    __DSB();
+
+    /* ── NSS (PB12) → GPIO Output ───────────────────── */
+    GPIOB->MODER  &= ~(3U << (SPI2_NSS_PIN * 2));
+    GPIOB->MODER  |=  (1U << (SPI2_NSS_PIN * 2));
+    GPIOB->OTYPER &= ~(1U << SPI2_NSS_PIN);
+    GPIOB->OSPEEDR|=  (3U << (SPI2_NSS_PIN * 2));
+    SPI2_NSS_High();   // deselect mặc định
+
+    /* ── SCK, MISO, MOSI → AF5 ──────────────────────── */
+    uint8_t af_pins[] = {SPI2_SCK_PIN, SPI2_MISO_PIN, SPI2_MOSI_PIN};
+    for (uint8_t i = 0; i < 3; i++) {
+        uint8_t pin = af_pins[i];
+        GPIOB->MODER  &= ~(3U << (pin * 2));
+        GPIOB->MODER  |=  (2U << (pin * 2));          // AF
+        GPIOB->OSPEEDR|=  (3U << (pin * 2));           // Very high speed
+        GPIOB->PUPDR  &= ~(3U << (pin * 2));           // No pull
+        /* AFR[1] cho pin 8–15 → index = pin - 8 */
+        GPIOB->AFR[1] &= ~(0xFU << ((pin - 8) * 4));
+        GPIOB->AFR[1] |=  (SPI2_AF << ((pin - 8) * 4));
+    }
+
+    /* ── SPI2 Config ────────────────────────────────── */
+    SPI2->CR1 = 0;
+    SPI2->CR1 = SPI_CR1_MSTR        // Master
+              | SPI_CR1_SSI         // Internal slave select
+              | SPI_CR1_SSM         // Software NSS
+              | (0U << SPI_CR1_BR_Pos)  // Baud = fPCLK/2 = 21 MHz
+              | SPI_CR1_SPE;        // Enable SPI
+
+    SPI2->CR2 = 0;
+}
+
+/* ────────────────────────────────────────────────────
+ *  SPI2_Transmit — blocking, byte-by-byte
+ * ──────────────────────────────────────────────────── */
+void SPI2_Transmit(const uint8_t *data, uint16_t len) {
+    SPI2_NSS_Low();
+    SPI2_Delay(10);   // setup time
+
+    for (uint16_t i = 0; i < len; i++) {
+        /* Chờ TXE (Transmit buffer empty) */
+        uint32_t timeout = 10000;
+        while (!(SPI2->SR & SPI_SR_TXE) && --timeout);
+
+        *(__IO uint8_t *)&SPI2->DR = data[i];
+
+        /* Chờ RXNE để clear DR (tránh overrun) */
+        timeout = 10000;
+        while (!(SPI2->SR & SPI_SR_RXNE) && --timeout);
+        (void)SPI2->DR;  // dummy read
+    }
+
+    /* Chờ BSY = 0 (truyền xong hoàn toàn) */
+    uint32_t timeout = 50000;
+    while ((SPI2->SR & SPI_SR_BSY) && --timeout);
+
+    SPI2_Delay(10);
+    SPI2_NSS_High();
+}
+
+uint8_t SPI2_GetStatus(void) {
+    return (uint8_t)(SPI2->SR & 0xFF);
+}

@@ -1,0 +1,802 @@
+
+stm32_timestamp.elf:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+08000000 <__libc_init_array>:
+ 8000000:	b570      	push	{r4, r5, r6, lr}
+ 8000002:	4b0f      	ldr	r3, [pc, #60]	@ (8000040 <__libc_init_array+0x40>)
+ 8000004:	4d0f      	ldr	r5, [pc, #60]	@ (8000044 <__libc_init_array+0x44>)
+ 8000006:	42ab      	cmp	r3, r5
+ 8000008:	eba3 0605 	sub.w	r6, r3, r5
+ 800000c:	d007      	beq.n	800001e <__libc_init_array+0x1e>
+ 800000e:	10b6      	asrs	r6, r6, #2
+ 8000010:	2400      	movs	r4, #0
+ 8000012:	f855 3b04 	ldr.w	r3, [r5], #4
+ 8000016:	3401      	adds	r4, #1
+ 8000018:	4798      	blx	r3
+ 800001a:	42a6      	cmp	r6, r4
+ 800001c:	d8f9      	bhi.n	8000012 <__libc_init_array+0x12>
+ 800001e:	f000 fa1b 	bl	8000458 <_init>
+ 8000022:	4d09      	ldr	r5, [pc, #36]	@ (8000048 <__libc_init_array+0x48>)
+ 8000024:	4b09      	ldr	r3, [pc, #36]	@ (800004c <__libc_init_array+0x4c>)
+ 8000026:	1b5e      	subs	r6, r3, r5
+ 8000028:	42ab      	cmp	r3, r5
+ 800002a:	ea4f 06a6 	mov.w	r6, r6, asr #2
+ 800002e:	d006      	beq.n	800003e <__libc_init_array+0x3e>
+ 8000030:	2400      	movs	r4, #0
+ 8000032:	f855 3b04 	ldr.w	r3, [r5], #4
+ 8000036:	3401      	adds	r4, #1
+ 8000038:	4798      	blx	r3
+ 800003a:	42a6      	cmp	r6, r4
+ 800003c:	d8f9      	bhi.n	8000032 <__libc_init_array+0x32>
+ 800003e:	bd70      	pop	{r4, r5, r6, pc}
+	...
+
+08000050 <main>:
+#include "data_packet.h"
+
+volatile SystemState_t g_system_state = STATE_IDLE;
+volatile uint32_t g_wait_timeout = 0;
+
+int main(void) {
+ 8000050:	b580      	push	{r7, lr}
+ 8000052:	b086      	sub	sp, #24
+    SystemClock_Config();
+ 8000054:	f000 f9b8 	bl	80003c8 <SystemClock_Config>
+    GPIO_Control_Init();
+ 8000058:	f000 f856 	bl	8000108 <GPIO_Control_Init>
+    TIM2_Capture_Init();
+ 800005c:	f000 f89c 	bl	8000198 <TIM2_Capture_Init>
+    SPI2_Init();
+ 8000060:	f000 f91a 	bl	8000298 <SPI2_Init>
+ 8000064:	4c25      	ldr	r4, [pc, #148]	@ (80000fc <main+0xac>)
+ 8000066:	4e26      	ldr	r6, [pc, #152]	@ (8000100 <main+0xb0>)
+	        g_wait_timeout--;
+	    } else {
+	        DataReady_Clear();
+	        if (RunTrg_IsHigh()) {
+	            TIM2_Capture_Start();
+	            g_system_state = STATE_CAPTURING;
+ 8000068:	f04f 0801 	mov.w	r8, #1
+	    g_system_state = STATE_WAITING;
+ 800006c:	2703      	movs	r7, #3
+        switch (g_system_state) {
+ 800006e:	7823      	ldrb	r3, [r4, #0]
+ 8000070:	2b03      	cmp	r3, #3
+ 8000072:	d8fc      	bhi.n	800006e <main+0x1e>
+ 8000074:	e8df f003 	tbb	[pc, r3]
+ 8000078:	0212212c 	.word	0x0212212c
+	    if (g_wait_timeout > 0) {
+ 800007c:	6833      	ldr	r3, [r6, #0]
+ 800007e:	b383      	cbz	r3, 80000e2 <main+0x92>
+	        g_wait_timeout--;
+ 8000080:	6833      	ldr	r3, [r6, #0]
+ 8000082:	3b01      	subs	r3, #1
+ 8000084:	6033      	str	r3, [r6, #0]
+	        } else {
+	            g_system_state = STATE_IDLE;
+	        }
+	    }
+	    /* Kiểm tra nút bấm tắt bất kỳ lúc nào */
+	    if (!RunTrg_IsHigh()) {
+ 8000086:	f000 f87f 	bl	8000188 <RunTrg_IsHigh>
+ 800008a:	4605      	mov	r5, r0
+ 800008c:	2800      	cmp	r0, #0
+ 800008e:	d1ee      	bne.n	800006e <main+0x1e>
+	        DataReady_Clear();
+ 8000090:	f000 f872 	bl	8000178 <DataReady_Clear>
+	        TIM2_Capture_Stop();
+ 8000094:	f000 f8ea 	bl	800026c <TIM2_Capture_Stop>
+	        g_system_state = STATE_IDLE;
+ 8000098:	7025      	strb	r5, [r4, #0]
+ 800009a:	e7e8      	b.n	800006e <main+0x1e>
+	    Packet_Build(&g_capture, &pkt);
+ 800009c:	4819      	ldr	r0, [pc, #100]	@ (8000104 <main+0xb4>)
+ 800009e:	4669      	mov	r1, sp
+ 80000a0:	f000 f958 	bl	8000354 <Packet_Build>
+	    SPI2_Transmit(pkt.buf, pkt.len);
+ 80000a4:	f8bd 1014 	ldrh.w	r1, [sp, #20]
+ 80000a8:	4668      	mov	r0, sp
+ 80000aa:	f000 f93d 	bl	8000328 <SPI2_Transmit>
+	    DataReady_Set();
+ 80000ae:	f000 f85d 	bl	800016c <DataReady_Set>
+	    g_wait_timeout = 10;   // timeout 10ms (đếm ngược trong vòng lặp)
+ 80000b2:	230a      	movs	r3, #10
+	    g_system_state = STATE_WAITING;
+ 80000b4:	7027      	strb	r7, [r4, #0]
+	    g_wait_timeout = 10;   // timeout 10ms (đếm ngược trong vòng lặp)
+ 80000b6:	6033      	str	r3, [r6, #0]
+	    break;
+ 80000b8:	e7d9      	b.n	800006e <main+0x1e>
+            if (!RunTrg_IsHigh()) {
+ 80000ba:	f000 f865 	bl	8000188 <RunTrg_IsHigh>
+ 80000be:	4605      	mov	r5, r0
+ 80000c0:	2800      	cmp	r0, #0
+ 80000c2:	d1d4      	bne.n	800006e <main+0x1e>
+                TIM2_Capture_Stop();
+ 80000c4:	f000 f8d2 	bl	800026c <TIM2_Capture_Stop>
+                DataReady_Clear();
+ 80000c8:	f000 f856 	bl	8000178 <DataReady_Clear>
+                g_system_state = STATE_IDLE;
+ 80000cc:	7025      	strb	r5, [r4, #0]
+                break;
+ 80000ce:	e7ce      	b.n	800006e <main+0x1e>
+            if (RunTrg_IsHigh()) {
+ 80000d0:	f000 f85a 	bl	8000188 <RunTrg_IsHigh>
+ 80000d4:	2800      	cmp	r0, #0
+ 80000d6:	d0ca      	beq.n	800006e <main+0x1e>
+                TIM2_Capture_Start();
+ 80000d8:	f000 f8b2 	bl	8000240 <TIM2_Capture_Start>
+                g_system_state = STATE_CAPTURING;
+ 80000dc:	f884 8000 	strb.w	r8, [r4]
+ 80000e0:	e7c5      	b.n	800006e <main+0x1e>
+	        DataReady_Clear();
+ 80000e2:	f000 f849 	bl	8000178 <DataReady_Clear>
+	        if (RunTrg_IsHigh()) {
+ 80000e6:	f000 f84f 	bl	8000188 <RunTrg_IsHigh>
+ 80000ea:	b908      	cbnz	r0, 80000f0 <main+0xa0>
+	            g_system_state = STATE_IDLE;
+ 80000ec:	7020      	strb	r0, [r4, #0]
+ 80000ee:	e7ca      	b.n	8000086 <main+0x36>
+	            TIM2_Capture_Start();
+ 80000f0:	f000 f8a6 	bl	8000240 <TIM2_Capture_Start>
+	            g_system_state = STATE_CAPTURING;
+ 80000f4:	f884 8000 	strb.w	r8, [r4]
+ 80000f8:	e7c5      	b.n	8000086 <main+0x36>
+ 80000fa:	bf00      	nop
+ 80000fc:	20000004 	.word	0x20000004
+ 8000100:	20000000 	.word	0x20000000
+ 8000104:	20000008 	.word	0x20000008
+
+08000108 <GPIO_Control_Init>:
+#include "gpio_control.h"
+
+void GPIO_Control_Init(void) {
+    /* ── Enable clocks ──────────────────────────────── */
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;   // GPIOB cho PB0, PB1
+ 8000108:	4a16      	ldr	r2, [pc, #88]	@ (8000164 <GPIO_Control_Init+0x5c>)
+ 800010a:	6b13      	ldr	r3, [r2, #48]	@ 0x30
+ 800010c:	f043 0302 	orr.w	r3, r3, #2
+ 8000110:	6313      	str	r3, [r2, #48]	@ 0x30
+  \details Acts as a special kind of Data Memory Barrier.
+           It completes when all explicit memory accesses before this instruction complete.
+ */
+__STATIC_FORCEINLINE void __DSB(void)
+{
+  __ASM volatile ("dsb 0xF":::"memory");
+ 8000112:	f3bf 8f4f 	dsb	sy
+    __DSB();  // đảm bảo clock ổn định trước khi config
+
+    /* ── PB0 → OUTPUT (DATA_READY) ─────────────────── */
+    GPIOB->MODER  &= ~(3U << (DATA_READY_PIN * 2));
+ 8000116:	4b14      	ldr	r3, [pc, #80]	@ (8000168 <GPIO_Control_Init+0x60>)
+ 8000118:	681a      	ldr	r2, [r3, #0]
+ 800011a:	f022 0203 	bic.w	r2, r2, #3
+ 800011e:	601a      	str	r2, [r3, #0]
+    GPIOB->MODER  |=  (1U << (DATA_READY_PIN * 2));   // Output push-pull
+ 8000120:	681a      	ldr	r2, [r3, #0]
+ 8000122:	f042 0201 	orr.w	r2, r2, #1
+ 8000126:	601a      	str	r2, [r3, #0]
+    GPIOB->OTYPER &= ~(1U << DATA_READY_PIN);          // Push-pull
+ 8000128:	685a      	ldr	r2, [r3, #4]
+ 800012a:	f022 0201 	bic.w	r2, r2, #1
+ 800012e:	605a      	str	r2, [r3, #4]
+    GPIOB->OSPEEDR|=  (3U << (DATA_READY_PIN * 2));    // Very high speed
+ 8000130:	689a      	ldr	r2, [r3, #8]
+ 8000132:	f042 0203 	orr.w	r2, r2, #3
+ 8000136:	609a      	str	r2, [r3, #8]
+    GPIOB->PUPDR  &= ~(3U << (DATA_READY_PIN * 2));    // No pull
+ 8000138:	68da      	ldr	r2, [r3, #12]
+ 800013a:	f022 0203 	bic.w	r2, r2, #3
+ 800013e:	60da      	str	r2, [r3, #12]
+    GPIOB->ODR    &= ~(1U << DATA_READY_PIN);           // Mặc định Low
+ 8000140:	695a      	ldr	r2, [r3, #20]
+ 8000142:	f022 0201 	bic.w	r2, r2, #1
+ 8000146:	615a      	str	r2, [r3, #20]
+
+    /* ── PB1 → INPUT (RUN_TRG) ─────────────────────── */
+    GPIOB->MODER  &= ~(3U << (RUN_TRG_PIN * 2));       // Input mode
+ 8000148:	681a      	ldr	r2, [r3, #0]
+ 800014a:	f022 020c 	bic.w	r2, r2, #12
+ 800014e:	601a      	str	r2, [r3, #0]
+    GPIOB->PUPDR  &= ~(3U << (RUN_TRG_PIN * 2));
+ 8000150:	68da      	ldr	r2, [r3, #12]
+ 8000152:	f022 020c 	bic.w	r2, r2, #12
+ 8000156:	60da      	str	r2, [r3, #12]
+    GPIOB->PUPDR  |=  (2U << (RUN_TRG_PIN * 2));       // Pull-down
+ 8000158:	68da      	ldr	r2, [r3, #12]
+ 800015a:	f042 0208 	orr.w	r2, r2, #8
+ 800015e:	60da      	str	r2, [r3, #12]
+    // (công tắc nối 3.3V → High khi bật, pull-down giữ Low khi tắt)
+}
+ 8000160:	4770      	bx	lr
+ 8000162:	bf00      	nop
+ 8000164:	40023800 	.word	0x40023800
+ 8000168:	40020400 	.word	0x40020400
+
+0800016c <DataReady_Set>:
+
+void DataReady_Set(void) {
+    GPIOB->BSRR = (1U << DATA_READY_PIN);   // Atomic set High
+ 800016c:	4b01      	ldr	r3, [pc, #4]	@ (8000174 <DataReady_Set+0x8>)
+ 800016e:	2201      	movs	r2, #1
+ 8000170:	619a      	str	r2, [r3, #24]
+}
+ 8000172:	4770      	bx	lr
+ 8000174:	40020400 	.word	0x40020400
+
+08000178 <DataReady_Clear>:
+
+void DataReady_Clear(void) {
+    GPIOB->BSRR = (1U << (DATA_READY_PIN + 16));  // Atomic set Low
+ 8000178:	4b02      	ldr	r3, [pc, #8]	@ (8000184 <DataReady_Clear+0xc>)
+ 800017a:	f44f 3280 	mov.w	r2, #65536	@ 0x10000
+ 800017e:	619a      	str	r2, [r3, #24]
+}
+ 8000180:	4770      	bx	lr
+ 8000182:	bf00      	nop
+ 8000184:	40020400 	.word	0x40020400
+
+08000188 <RunTrg_IsHigh>:
+bool DataReady_IsHigh(void) {
+    return (GPIOB->ODR & (1U << DATA_READY_PIN)) != 0;
+}
+
+bool RunTrg_IsHigh(void) {
+    return (GPIOB->IDR & (1U << RUN_TRG_PIN)) != 0;
+ 8000188:	4b02      	ldr	r3, [pc, #8]	@ (8000194 <RunTrg_IsHigh+0xc>)
+ 800018a:	6918      	ldr	r0, [r3, #16]
+}
+ 800018c:	f3c0 0040 	ubfx	r0, r0, #1, #1
+ 8000190:	4770      	bx	lr
+ 8000192:	bf00      	nop
+ 8000194:	40020400 	.word	0x40020400
+
+08000198 <TIM2_Capture_Init>:
+ *  PA0→CH1, PA1→CH2, PA2→CH3, PA3→CH4
+ *  TIM2: 32-bit, prescaler=0 → tick = HCLK (168 MHz)
+ * ──────────────────────────────────────────────────── */
+void TIM2_Capture_Init(void) {
+    /* ── Enable clocks ──────────────────────────────── */
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+ 8000198:	4b27      	ldr	r3, [pc, #156]	@ (8000238 <TIM2_Capture_Init+0xa0>)
+ 800019a:	6b1a      	ldr	r2, [r3, #48]	@ 0x30
+ 800019c:	f042 0201 	orr.w	r2, r2, #1
+void TIM2_Capture_Init(void) {
+ 80001a0:	b570      	push	{r4, r5, r6, lr}
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+ 80001a2:	631a      	str	r2, [r3, #48]	@ 0x30
+    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+ 80001a4:	6c1a      	ldr	r2, [r3, #64]	@ 0x40
+ 80001a6:	f042 0201 	orr.w	r2, r2, #1
+ 80001aa:	641a      	str	r2, [r3, #64]	@ 0x40
+ 80001ac:	f3bf 8f4f 	dsb	sy
+ 80001b0:	2100      	movs	r1, #0
+    __DSB();
+
+    /* ── GPIO PA0–PA3: Alternate Function (AF1 = TIM2) ── */
+    for (uint8_t pin = 0; pin < 4; pin++) {
+        GPIOA->MODER  &= ~(3U << (pin * 2));
+ 80001b2:	f5a3 5360 	sub.w	r3, r3, #14336	@ 0x3800
+ 80001b6:	2503      	movs	r5, #3
+        GPIOA->MODER  |=  (2U << (pin * 2));   // AF mode
+ 80001b8:	2402      	movs	r4, #2
+        GPIOA->PUPDR  &= ~(3U << (pin * 2));    // No pull
+        GPIOA->AFR[0] &= ~(0xFU << (pin * 4));
+ 80001ba:	f04f 0e0f 	mov.w	lr, #15
+        GPIOA->AFR[0] |=  (0x1U << (pin * 4)); // AF1 = TIM2
+ 80001be:	f04f 0c01 	mov.w	ip, #1
+        GPIOA->MODER  &= ~(3U << (pin * 2));
+ 80001c2:	681a      	ldr	r2, [r3, #0]
+ 80001c4:	fa05 f601 	lsl.w	r6, r5, r1
+ 80001c8:	ea22 0206 	bic.w	r2, r2, r6
+ 80001cc:	601a      	str	r2, [r3, #0]
+        GPIOA->MODER  |=  (2U << (pin * 2));   // AF mode
+ 80001ce:	6818      	ldr	r0, [r3, #0]
+ 80001d0:	fa04 f201 	lsl.w	r2, r4, r1
+ 80001d4:	4302      	orrs	r2, r0
+ 80001d6:	601a      	str	r2, [r3, #0]
+        GPIOA->PUPDR  &= ~(3U << (pin * 2));    // No pull
+ 80001d8:	68d8      	ldr	r0, [r3, #12]
+ 80001da:	ea20 0006 	bic.w	r0, r0, r6
+ 80001de:	60d8      	str	r0, [r3, #12]
+        GPIOA->AFR[0] &= ~(0xFU << (pin * 4));
+ 80001e0:	6a18      	ldr	r0, [r3, #32]
+ 80001e2:	004a      	lsls	r2, r1, #1
+ 80001e4:	fa0e f602 	lsl.w	r6, lr, r2
+ 80001e8:	ea20 0006 	bic.w	r0, r0, r6
+ 80001ec:	6218      	str	r0, [r3, #32]
+        GPIOA->AFR[0] |=  (0x1U << (pin * 4)); // AF1 = TIM2
+ 80001ee:	6a18      	ldr	r0, [r3, #32]
+ 80001f0:	fa0c f202 	lsl.w	r2, ip, r2
+    for (uint8_t pin = 0; pin < 4; pin++) {
+ 80001f4:	3102      	adds	r1, #2
+        GPIOA->AFR[0] |=  (0x1U << (pin * 4)); // AF1 = TIM2
+ 80001f6:	4302      	orrs	r2, r0
+    for (uint8_t pin = 0; pin < 4; pin++) {
+ 80001f8:	2908      	cmp	r1, #8
+        GPIOA->AFR[0] |=  (0x1U << (pin * 4)); // AF1 = TIM2
+ 80001fa:	621a      	str	r2, [r3, #32]
+    for (uint8_t pin = 0; pin < 4; pin++) {
+ 80001fc:	d1e1      	bne.n	80001c2 <TIM2_Capture_Init+0x2a>
+    }
+
+    /* ── TIM2 Base Config ───────────────────────────── */
+    TIM2->CR1   = 0;
+ 80001fe:	f04f 4380 	mov.w	r3, #1073741824	@ 0x40000000
+ 8000202:	2200      	movs	r2, #0
+    TIM2->ARR   = 0xFFFFFFFF;   // 32-bit full range
+    TIM2->CNT   = 0;
+
+    /* ── Input Capture: CH1–CH4, rising edge ───────── */
+    // CCMR1: CH1 (CC1S=01 input TI1), CH2 (CC2S=01 input TI2)
+    TIM2->CCMR1 = (1U << TIM_CCMR1_CC1S_Pos)   // CH1 → TI1
+ 8000204:	f240 1001 	movw	r0, #257	@ 0x101
+ */
+__STATIC_INLINE void __NVIC_SetPriority(IRQn_Type IRQn, uint32_t priority)
+{
+  if ((int32_t)(IRQn) >= 0)
+  {
+    NVIC->IP[((uint32_t)IRQn)]               = (uint8_t)((priority << (8U - __NVIC_PRIO_BITS)) & (uint32_t)0xFFUL);
+ 8000208:	490c      	ldr	r1, [pc, #48]	@ (800023c <TIM2_Capture_Init+0xa4>)
+    TIM2->CR1   = 0;
+ 800020a:	601a      	str	r2, [r3, #0]
+    TIM2->ARR   = 0xFFFFFFFF;   // 32-bit full range
+ 800020c:	f04f 34ff 	mov.w	r4, #4294967295	@ 0xffffffff
+    TIM2->PSC   = 0;            // Prescaler = 0 → 168 MHz tick
+ 8000210:	629a      	str	r2, [r3, #40]	@ 0x28
+    TIM2->ARR   = 0xFFFFFFFF;   // 32-bit full range
+ 8000212:	62dc      	str	r4, [r3, #44]	@ 0x2c
+    TIM2->CNT   = 0;
+ 8000214:	625a      	str	r2, [r3, #36]	@ 0x24
+    // CCMR2: CH3 (CC3S=01 input TI3), CH4 (CC4S=01 input TI4)
+    TIM2->CCMR2 = (1U << TIM_CCMR2_CC3S_Pos)   // CH3 → TI3
+                | (1U << TIM_CCMR2_CC4S_Pos);   // CH4 → TI4
+
+    // CCER: Enable CH1–CH4, rising edge (CCxP=0, CCxNP=0)
+    TIM2->CCER  = TIM_CCER_CC1E
+ 8000216:	f241 1411 	movw	r4, #4369	@ 0x1111
+    TIM2->CCMR1 = (1U << TIM_CCMR1_CC1S_Pos)   // CH1 → TI1
+ 800021a:	6198      	str	r0, [r3, #24]
+    TIM2->CCMR2 = (1U << TIM_CCMR2_CC3S_Pos)   // CH3 → TI3
+ 800021c:	61d8      	str	r0, [r3, #28]
+                | TIM_CCER_CC2E
+                | TIM_CCER_CC3E
+                | TIM_CCER_CC4E;
+
+    /* ── Enable Capture Interrupts CH1–CH4 ─────────── */
+    TIM2->DIER  = TIM_DIER_CC1IE
+ 800021e:	201e      	movs	r0, #30
+    TIM2->CCER  = TIM_CCER_CC1E
+ 8000220:	621c      	str	r4, [r3, #32]
+    TIM2->DIER  = TIM_DIER_CC1IE
+ 8000222:	60d8      	str	r0, [r3, #12]
+ 8000224:	f881 231c 	strb.w	r2, [r1, #796]	@ 0x31c
+    NVIC->ISER[(((uint32_t)IRQn) >> 5UL)] = (uint32_t)(1UL << (((uint32_t)IRQn) & 0x1FUL));
+ 8000228:	f04f 5280 	mov.w	r2, #268435456	@ 0x10000000
+ 800022c:	600a      	str	r2, [r1, #0]
+    /* ── NVIC ───────────────────────────────────────── */
+    NVIC_SetPriority(TIM2_IRQn, 0);  // Priority cao nhất
+    NVIC_EnableIRQ(TIM2_IRQn);
+
+    /* Timer chưa start, chờ PB1 High */
+    TIM2->CR1 &= ~TIM_CR1_CEN;
+ 800022e:	681a      	ldr	r2, [r3, #0]
+ 8000230:	f022 0201 	bic.w	r2, r2, #1
+ 8000234:	601a      	str	r2, [r3, #0]
+}
+ 8000236:	bd70      	pop	{r4, r5, r6, pc}
+ 8000238:	40023800 	.word	0x40023800
+ 800023c:	e000e100 	.word	0xe000e100
+
+08000240 <TIM2_Capture_Start>:
+ *  Start: xoá state + bật TIM2
+ * ──────────────────────────────────────────────────── */
+void TIM2_Capture_Start(void) {
+    /* Reset capture data */
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        g_capture.timestamp[i] = 0;
+ 8000240:	4a09      	ldr	r2, [pc, #36]	@ (8000268 <TIM2_Capture_Start+0x28>)
+        g_capture.captured[i]  = false;
+    }
+    g_capture.count = 0;
+
+    /* Xoá pending flags trước khi start */
+    TIM2->SR  = 0;
+ 8000242:	f04f 4180 	mov.w	r1, #1073741824	@ 0x40000000
+        g_capture.timestamp[i] = 0;
+ 8000246:	2300      	movs	r3, #0
+ 8000248:	6013      	str	r3, [r2, #0]
+        g_capture.captured[i]  = false;
+ 800024a:	7413      	strb	r3, [r2, #16]
+        g_capture.timestamp[i] = 0;
+ 800024c:	6053      	str	r3, [r2, #4]
+        g_capture.captured[i]  = false;
+ 800024e:	7453      	strb	r3, [r2, #17]
+        g_capture.timestamp[i] = 0;
+ 8000250:	6093      	str	r3, [r2, #8]
+        g_capture.captured[i]  = false;
+ 8000252:	7493      	strb	r3, [r2, #18]
+        g_capture.timestamp[i] = 0;
+ 8000254:	60d3      	str	r3, [r2, #12]
+        g_capture.captured[i]  = false;
+ 8000256:	74d3      	strb	r3, [r2, #19]
+    g_capture.count = 0;
+ 8000258:	7513      	strb	r3, [r2, #20]
+    TIM2->SR  = 0;
+ 800025a:	610b      	str	r3, [r1, #16]
+    TIM2->CNT = 0;
+ 800025c:	624b      	str	r3, [r1, #36]	@ 0x24
+    TIM2->CR1 |= TIM_CR1_CEN;
+ 800025e:	680b      	ldr	r3, [r1, #0]
+ 8000260:	f043 0301 	orr.w	r3, r3, #1
+ 8000264:	600b      	str	r3, [r1, #0]
+}
+ 8000266:	4770      	bx	lr
+ 8000268:	20000008 	.word	0x20000008
+
+0800026c <TIM2_Capture_Stop>:
+
+/* ────────────────────────────────────────────────────
+ *  Stop: tắt TIM2, xoá hết
+ * ──────────────────────────────────────────────────── */
+void TIM2_Capture_Stop(void) {
+    TIM2->CR1 &= ~TIM_CR1_CEN;
+ 800026c:	f04f 4180 	mov.w	r1, #1073741824	@ 0x40000000
+    TIM2->SR   = 0;
+
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        g_capture.timestamp[i] = 0;
+ 8000270:	4a08      	ldr	r2, [pc, #32]	@ (8000294 <TIM2_Capture_Stop+0x28>)
+    TIM2->CR1 &= ~TIM_CR1_CEN;
+ 8000272:	6808      	ldr	r0, [r1, #0]
+    TIM2->SR   = 0;
+ 8000274:	2300      	movs	r3, #0
+    TIM2->CR1 &= ~TIM_CR1_CEN;
+ 8000276:	f020 0001 	bic.w	r0, r0, #1
+ 800027a:	6008      	str	r0, [r1, #0]
+    TIM2->SR   = 0;
+ 800027c:	610b      	str	r3, [r1, #16]
+        g_capture.timestamp[i] = 0;
+ 800027e:	6013      	str	r3, [r2, #0]
+        g_capture.captured[i]  = false;
+ 8000280:	7413      	strb	r3, [r2, #16]
+        g_capture.timestamp[i] = 0;
+ 8000282:	6053      	str	r3, [r2, #4]
+        g_capture.captured[i]  = false;
+ 8000284:	7453      	strb	r3, [r2, #17]
+        g_capture.timestamp[i] = 0;
+ 8000286:	6093      	str	r3, [r2, #8]
+        g_capture.captured[i]  = false;
+ 8000288:	7493      	strb	r3, [r2, #18]
+        g_capture.timestamp[i] = 0;
+ 800028a:	60d3      	str	r3, [r2, #12]
+        g_capture.captured[i]  = false;
+ 800028c:	74d3      	strb	r3, [r2, #19]
+    }
+    g_capture.count = 0;
+ 800028e:	7513      	strb	r3, [r2, #20]
+}
+ 8000290:	4770      	bx	lr
+ 8000292:	bf00      	nop
+ 8000294:	20000008 	.word	0x20000008
+
+08000298 <SPI2_Init>:
+#include "spi_comm.h"
+
+/* Định nghĩa chân PB12 là NSS (hardware, do master kéo) */
+void SPI2_Init(void) {
+    /* Clock GPIOB, SPI2 */
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+ 8000298:	4b21      	ldr	r3, [pc, #132]	@ (8000320 <SPI2_Init+0x88>)
+ 800029a:	6b1a      	ldr	r2, [r3, #48]	@ 0x30
+ 800029c:	f042 0202 	orr.w	r2, r2, #2
+void SPI2_Init(void) {
+ 80002a0:	b570      	push	{r4, r5, r6, lr}
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+ 80002a2:	631a      	str	r2, [r3, #48]	@ 0x30
+    RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
+ 80002a4:	6c1a      	ldr	r2, [r3, #64]	@ 0x40
+ 80002a6:	f442 4280 	orr.w	r2, r2, #16384	@ 0x4000
+ 80002aa:	641a      	str	r2, [r3, #64]	@ 0x40
+ 80002ac:	f3bf 8f4f 	dsb	sy
+ 80002b0:	2118      	movs	r1, #24
+    __DSB();
+
+    /* Cấu hình chân SPI2: PB12(NSS), PB13(SCK), PB14(MISO), PB15(MOSI) tất cả AF5 */
+    for (int pin = 12; pin <= 15; pin++) {
+        GPIOB->MODER &= ~(3U << (pin * 2));
+ 80002b2:	f5a3 5350 	sub.w	r3, r3, #13312	@ 0x3400
+ 80002b6:	2503      	movs	r5, #3
+        GPIOB->MODER |=  (2U << (pin * 2));          // Alternate function
+ 80002b8:	2402      	movs	r4, #2
+        GPIOB->OSPEEDR |= (3U << (pin * 2));         // High speed
+        GPIOB->PUPDR   &= ~(3U << (pin * 2));        // No pull
+        /* AFRH cho pin 8-15 */
+        GPIOB->AFR[1] &= ~(0xFU << ((pin - 8) * 4));
+ 80002ba:	f04f 0e0f 	mov.w	lr, #15
+        GPIOB->AFR[1] |=  (5U << ((pin - 8) * 4));   // AF5 = SPI2
+ 80002be:	f04f 0c05 	mov.w	ip, #5
+        GPIOB->MODER &= ~(3U << (pin * 2));
+ 80002c2:	681a      	ldr	r2, [r3, #0]
+ 80002c4:	fa05 f601 	lsl.w	r6, r5, r1
+ 80002c8:	ea22 0206 	bic.w	r2, r2, r6
+ 80002cc:	601a      	str	r2, [r3, #0]
+        GPIOB->MODER |=  (2U << (pin * 2));          // Alternate function
+ 80002ce:	6818      	ldr	r0, [r3, #0]
+ 80002d0:	fa04 f201 	lsl.w	r2, r4, r1
+ 80002d4:	4302      	orrs	r2, r0
+ 80002d6:	601a      	str	r2, [r3, #0]
+        GPIOB->OSPEEDR |= (3U << (pin * 2));         // High speed
+ 80002d8:	6898      	ldr	r0, [r3, #8]
+ 80002da:	4330      	orrs	r0, r6
+ 80002dc:	6098      	str	r0, [r3, #8]
+        GPIOB->PUPDR   &= ~(3U << (pin * 2));        // No pull
+ 80002de:	68d8      	ldr	r0, [r3, #12]
+ 80002e0:	ea20 0006 	bic.w	r0, r0, r6
+ 80002e4:	60d8      	str	r0, [r3, #12]
+        GPIOB->AFR[1] &= ~(0xFU << ((pin - 8) * 4));
+ 80002e6:	004a      	lsls	r2, r1, #1
+ 80002e8:	6a58      	ldr	r0, [r3, #36]	@ 0x24
+ 80002ea:	3a20      	subs	r2, #32
+ 80002ec:	fa0e f602 	lsl.w	r6, lr, r2
+ 80002f0:	ea20 0006 	bic.w	r0, r0, r6
+ 80002f4:	6258      	str	r0, [r3, #36]	@ 0x24
+        GPIOB->AFR[1] |=  (5U << ((pin - 8) * 4));   // AF5 = SPI2
+ 80002f6:	6a58      	ldr	r0, [r3, #36]	@ 0x24
+ 80002f8:	fa0c f202 	lsl.w	r2, ip, r2
+    for (int pin = 12; pin <= 15; pin++) {
+ 80002fc:	3102      	adds	r1, #2
+        GPIOB->AFR[1] |=  (5U << ((pin - 8) * 4));   // AF5 = SPI2
+ 80002fe:	4302      	orrs	r2, r0
+    for (int pin = 12; pin <= 15; pin++) {
+ 8000300:	2920      	cmp	r1, #32
+        GPIOB->AFR[1] |=  (5U << ((pin - 8) * 4));   // AF5 = SPI2
+ 8000302:	625a      	str	r2, [r3, #36]	@ 0x24
+    for (int pin = 12; pin <= 15; pin++) {
+ 8000304:	d1dd      	bne.n	80002c2 <SPI2_Init+0x2a>
+    }
+    /* Riêng PB12 NSS: cấu hình hardware NSS (không phải output) */
+    GPIOB->MODER &= ~(3U << (12 * 2));               // vẫn là AF
+ 8000306:	6819      	ldr	r1, [r3, #0]
+
+    /* Cấu hình SPI2 ở chế độ Slave, mode 0, 8-bit */
+    SPI2->CR1 = 0;                    // CPOL=0, CPHA=0, MSTR=0
+ 8000308:	4a06      	ldr	r2, [pc, #24]	@ (8000324 <SPI2_Init+0x8c>)
+ 800030a:	2000      	movs	r0, #0
+    GPIOB->MODER &= ~(3U << (12 * 2));               // vẫn là AF
+ 800030c:	f021 7140 	bic.w	r1, r1, #50331648	@ 0x3000000
+ 8000310:	6019      	str	r1, [r3, #0]
+    SPI2->CR1 = 0;                    // CPOL=0, CPHA=0, MSTR=0
+ 8000312:	6010      	str	r0, [r2, #0]
+    SPI2->CR2 = 0;
+ 8000314:	6050      	str	r0, [r2, #4]
+    SPI2->CR1 |= SPI_CR1_SPE;         // Enable SPI
+ 8000316:	6813      	ldr	r3, [r2, #0]
+ 8000318:	f043 0340 	orr.w	r3, r3, #64	@ 0x40
+ 800031c:	6013      	str	r3, [r2, #0]
+}
+ 800031e:	bd70      	pop	{r4, r5, r6, pc}
+ 8000320:	40023800 	.word	0x40023800
+ 8000324:	40003800 	.word	0x40003800
+
+08000328 <SPI2_Transmit>:
+
+/* Hàm truyền dữ liệu (blocking) – chờ master kéo CS và cấp clock */
+void SPI2_Transmit(const uint8_t *data, uint16_t len) {
+    for (uint16_t i = 0; i < len; i++) {
+ 8000328:	b169      	cbz	r1, 8000346 <SPI2_Transmit+0x1e>
+        /* Chờ TXE (master bắt đầu giao dịch) */
+        while (!(SPI2->SR & SPI_SR_TXE));
+ 800032a:	4b09      	ldr	r3, [pc, #36]	@ (8000350 <SPI2_Transmit+0x28>)
+ 800032c:	4401      	add	r1, r0
+ 800032e:	689a      	ldr	r2, [r3, #8]
+ 8000330:	0792      	lsls	r2, r2, #30
+ 8000332:	d5fc      	bpl.n	800032e <SPI2_Transmit+0x6>
+        *(__IO uint8_t *)&SPI2->DR = data[i];
+ 8000334:	f810 2b01 	ldrb.w	r2, [r0], #1
+ 8000338:	731a      	strb	r2, [r3, #12]
+        /* Chờ RXNE để đọc byte rác (do master gửi 0x00) */
+        while (!(SPI2->SR & SPI_SR_RXNE));
+ 800033a:	689a      	ldr	r2, [r3, #8]
+ 800033c:	07d2      	lsls	r2, r2, #31
+ 800033e:	d5fc      	bpl.n	800033a <SPI2_Transmit+0x12>
+    for (uint16_t i = 0; i < len; i++) {
+ 8000340:	4288      	cmp	r0, r1
+        (void)SPI2->DR;   // bỏ qua
+ 8000342:	68da      	ldr	r2, [r3, #12]
+    for (uint16_t i = 0; i < len; i++) {
+ 8000344:	d1f3      	bne.n	800032e <SPI2_Transmit+0x6>
+    }
+    /* Chờ đến khi BUSY = 0 (kết thúc giao dịch) */
+    while (SPI2->SR & SPI_SR_BSY);
+ 8000346:	4a02      	ldr	r2, [pc, #8]	@ (8000350 <SPI2_Transmit+0x28>)
+ 8000348:	6893      	ldr	r3, [r2, #8]
+ 800034a:	061b      	lsls	r3, r3, #24
+ 800034c:	d4fc      	bmi.n	8000348 <SPI2_Transmit+0x20>
+}
+ 800034e:	4770      	bx	lr
+ 8000350:	40003800 	.word	0x40003800
+
+08000354 <Packet_Build>:
+#include "data_packet.h"
+#include <string.h>
+*/
+static const char sensor_id[NUM_SENSORS] = {'A', 'B', 'C', 'D'};
+
+void Packet_Build(const volatile CaptureData_t *cap, Packet_t *out) {
+ 8000354:	b510      	push	{r4, lr}
+    out->len = PACKET_BUF_SIZE;
+ 8000356:	2314      	movs	r3, #20
+ 8000358:	4c10      	ldr	r4, [pc, #64]	@ (800039c <Packet_Build+0x48>)
+ 800035a:	828b      	strh	r3, [r1, #20]
+    uint8_t *p = out->buf;
+ 800035c:	f04f 0c00 	mov.w	ip, #0
+
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        uint32_t ts = cap->timestamp[i];
+ 8000360:	f850 202c 	ldr.w	r2, [r0, ip, lsl #2]
+        *p++ = (uint8_t)sensor_id[i];
+ 8000364:	f814 eb01 	ldrb.w	lr, [r4], #1
+ 8000368:	2300      	movs	r3, #0
+ 800036a:	f36e 0307 	bfi	r3, lr, #0, #8
+        *p++ = (uint8_t)(ts >> 24);
+ 800036e:	ea4f 6e12 	mov.w	lr, r2, lsr #24
+        *p++ = (uint8_t)sensor_id[i];
+ 8000372:	f36e 230f 	bfi	r3, lr, #8, #8
+        *p++ = (uint8_t)(ts >> 16);
+ 8000376:	ea4f 4e12 	mov.w	lr, r2, lsr #16
+        *p++ = (uint8_t)sensor_id[i];
+ 800037a:	f36e 4317 	bfi	r3, lr, #16, #8
+        *p++ = (uint8_t)(ts >> 8);
+ 800037e:	ea4f 2e12 	mov.w	lr, r2, lsr #8
+        *p++ = (uint8_t)sensor_id[i];
+ 8000382:	f36e 631f 	bfi	r3, lr, #24, #8
+ 8000386:	f841 3b05 	str.w	r3, [r1], #5
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+ 800038a:	f10c 0c01 	add.w	ip, ip, #1
+ 800038e:	f1bc 0f04 	cmp.w	ip, #4
+        *p++ = (uint8_t)(ts);
+ 8000392:	f801 2c01 	strb.w	r2, [r1, #-1]
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+ 8000396:	d1e3      	bne.n	8000360 <Packet_Build+0xc>
+    }
+}
+ 8000398:	bd10      	pop	{r4, pc}
+ 800039a:	bf00      	nop
+ 800039c:	08000460 	.word	0x08000460
+
+080003a0 <SystemInit>:
+ * Bare-metal tối giản: không cấu hình PLL ở đây,
+ * chỉ đảm bảo FPU được bật (Cortex-M4 hard-float).
+ */
+void SystemInit(void) {
+    /* ── Bật FPU (CP10, CP11 full access) ──────────── */
+    SCB->CPACR |= (0xFU << 20);
+ 80003a0:	4a07      	ldr	r2, [pc, #28]	@ (80003c0 <SystemInit+0x20>)
+ 80003a2:	f8d2 3088 	ldr.w	r3, [r2, #136]	@ 0x88
+ 80003a6:	f443 0370 	orr.w	r3, r3, #15728640	@ 0xf00000
+ 80003aa:	f8c2 3088 	str.w	r3, [r2, #136]	@ 0x88
+ 80003ae:	f3bf 8f4f 	dsb	sy
+  __ASM volatile ("isb 0xF":::"memory");
+ 80003b2:	f3bf 8f6f 	isb	sy
+    __DSB();
+    __ISB();
+
+    /* ── Tắt tất cả interrupt ngoại vi (an toàn khi reset) ── */
+    RCC->CIR = 0x00000000;
+ 80003b6:	4b03      	ldr	r3, [pc, #12]	@ (80003c4 <SystemInit+0x24>)
+ 80003b8:	2200      	movs	r2, #0
+ 80003ba:	60da      	str	r2, [r3, #12]
+}
+ 80003bc:	4770      	bx	lr
+ 80003be:	bf00      	nop
+ 80003c0:	e000ed00 	.word	0xe000ed00
+ 80003c4:	40023800 	.word	0x40023800
+
+080003c8 <SystemClock_Config>:
+void SystemClock_Config(void) {
+    /* Enable HSE */
+    RCC->CR |= RCC_CR_HSEON;
+ 80003c8:	4a0d      	ldr	r2, [pc, #52]	@ (8000400 <SystemClock_Config+0x38>)
+ 80003ca:	6813      	ldr	r3, [r2, #0]
+ 80003cc:	f443 3380 	orr.w	r3, r3, #65536	@ 0x10000
+ 80003d0:	6013      	str	r3, [r2, #0]
+    while (!(RCC->CR & RCC_CR_HSERDY));
+ 80003d2:	6813      	ldr	r3, [r2, #0]
+ 80003d4:	0399      	lsls	r1, r3, #14
+ 80003d6:	d5fc      	bpl.n	80003d2 <SystemClock_Config+0xa>
+
+    /* Cấu hình PLL: HSE 8MHz -> M=8 -> 1MHz, N=336 -> 336MHz, P=2 -> 168MHz */
+    RCC->PLLCFGR = (8 << RCC_PLLCFGR_PLLM_Pos)
+ 80003d8:	4b0a      	ldr	r3, [pc, #40]	@ (8000404 <SystemClock_Config+0x3c>)
+ 80003da:	6053      	str	r3, [r2, #4]
+                 | (0 << RCC_PLLCFGR_PLLP_Pos)   // PLLP = 2
+                 | (7 << RCC_PLLCFGR_PLLQ_Pos)
+                 | RCC_PLLCFGR_PLLSRC_HSE;
+
+    /* Enable PLL */
+    RCC->CR |= RCC_CR_PLLON;
+ 80003dc:	6813      	ldr	r3, [r2, #0]
+    while (!(RCC->CR & RCC_CR_PLLRDY));
+ 80003de:	4908      	ldr	r1, [pc, #32]	@ (8000400 <SystemClock_Config+0x38>)
+    RCC->CR |= RCC_CR_PLLON;
+ 80003e0:	f043 7380 	orr.w	r3, r3, #16777216	@ 0x1000000
+ 80003e4:	6013      	str	r3, [r2, #0]
+    while (!(RCC->CR & RCC_CR_PLLRDY));
+ 80003e6:	680b      	ldr	r3, [r1, #0]
+ 80003e8:	019b      	lsls	r3, r3, #6
+ 80003ea:	d5fc      	bpl.n	80003e6 <SystemClock_Config+0x1e>
+
+    /* Chọn PLL làm clock hệ thống, AHB prescaler = 1, APB1 = /4, APB2 = /2 */
+    RCC->CFGR = RCC_CFGR_SW_PLL
+ 80003ec:	f249 4302 	movw	r3, #37890	@ 0x9402
+              | RCC_CFGR_HPRE_DIV1
+              | RCC_CFGR_PPRE1_DIV4
+              | RCC_CFGR_PPRE2_DIV2;
+    while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL);
+ 80003f0:	4a03      	ldr	r2, [pc, #12]	@ (8000400 <SystemClock_Config+0x38>)
+    RCC->CFGR = RCC_CFGR_SW_PLL
+ 80003f2:	608b      	str	r3, [r1, #8]
+    while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL);
+ 80003f4:	6893      	ldr	r3, [r2, #8]
+ 80003f6:	f003 030c 	and.w	r3, r3, #12
+ 80003fa:	2b08      	cmp	r3, #8
+ 80003fc:	d1fa      	bne.n	80003f4 <SystemClock_Config+0x2c>
+}
+ 80003fe:	4770      	bx	lr
+ 8000400:	40023800 	.word	0x40023800
+ 8000404:	07405408 	.word	0x07405408
+
+08000408 <Reset_Handler>:
+ 8000408:	f8df d034 	ldr.w	sp, [pc, #52]	@ 8000440 <LoopFillZerobss+0xe>
+ 800040c:	f7ff ffc8 	bl	80003a0 <SystemInit>
+ 8000410:	480c      	ldr	r0, [pc, #48]	@ (8000444 <LoopFillZerobss+0x12>)
+ 8000412:	490d      	ldr	r1, [pc, #52]	@ (8000448 <LoopFillZerobss+0x16>)
+ 8000414:	4a0d      	ldr	r2, [pc, #52]	@ (800044c <LoopFillZerobss+0x1a>)
+ 8000416:	2300      	movs	r3, #0
+ 8000418:	e002      	b.n	8000420 <LoopCopyDataInit>
+
+0800041a <CopyDataInit>:
+ 800041a:	58d4      	ldr	r4, [r2, r3]
+ 800041c:	50c4      	str	r4, [r0, r3]
+ 800041e:	3304      	adds	r3, #4
+
+08000420 <LoopCopyDataInit>:
+ 8000420:	18c4      	adds	r4, r0, r3
+ 8000422:	428c      	cmp	r4, r1
+ 8000424:	d3f9      	bcc.n	800041a <CopyDataInit>
+ 8000426:	4a0a      	ldr	r2, [pc, #40]	@ (8000450 <LoopFillZerobss+0x1e>)
+ 8000428:	4c0a      	ldr	r4, [pc, #40]	@ (8000454 <LoopFillZerobss+0x22>)
+ 800042a:	2300      	movs	r3, #0
+ 800042c:	e001      	b.n	8000432 <LoopFillZerobss>
+
+0800042e <FillZerobss>:
+ 800042e:	6013      	str	r3, [r2, #0]
+ 8000430:	3204      	adds	r2, #4
+
+08000432 <LoopFillZerobss>:
+ 8000432:	42a2      	cmp	r2, r4
+ 8000434:	d3fb      	bcc.n	800042e <FillZerobss>
+ 8000436:	f7ff fde3 	bl	8000000 <__libc_init_array>
+ 800043a:	f7ff fe09 	bl	8000050 <main>
+ 800043e:	4770      	bx	lr
+ 8000440:	20020000 	.word	0x20020000
+ 8000444:	20000000 	.word	0x20000000
+ 8000448:	20000000 	.word	0x20000000
+ 800044c:	08000464 	.word	0x08000464
+ 8000450:	20000000 	.word	0x20000000
+ 8000454:	20000020 	.word	0x20000020
+
+08000458 <_init>:
+ 8000458:	b5f8      	push	{r3, r4, r5, r6, r7, lr}
+ 800045a:	bf00      	nop
+
+0800045c <_fini>:
+ 800045c:	b5f8      	push	{r3, r4, r5, r6, r7, lr}
+ 800045e:	bf00      	nop
+
+08000460 <sensor_id>:
+ 8000460:	4241 4443                                   ABCD
